@@ -757,6 +757,45 @@
 
         // Google Sheets API URL (stored in localStorage)
         let SHEETS_API_URL = localStorage.getItem('sheetsApiUrl') || '';
+        let lastSyncTime = 0;
+        const SYNC_THROTTLE_MS = 10000; // Only sync every 10 seconds max
+
+        // =================================================================
+        // DATE NORMALIZATION (handles Google Sheets date formats)
+        // =================================================================
+        function normalizeDate(dateValue) {
+            if (!dateValue) return null;
+
+            // Already in YYYY-MM-DD format
+            if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+                return dateValue;
+            }
+
+            // Google Sheets serial number (days since 1899-12-30)
+            if (typeof dateValue === 'number') {
+                const date = new Date((dateValue - 25569) * 86400 * 1000);
+                return getLocalDateString(date);
+            }
+
+            // String date like "1/2/2026" or "01/02/2026"
+            if (typeof dateValue === 'string') {
+                // Try MM/DD/YYYY format
+                const parts = dateValue.split('/');
+                if (parts.length === 3) {
+                    const month = parts[0].padStart(2, '0');
+                    const day = parts[1].padStart(2, '0');
+                    const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+                    return `${year}-${month}-${day}`;
+                }
+                // Try parsing as date string
+                const parsed = new Date(dateValue);
+                if (!isNaN(parsed.getTime())) {
+                    return getLocalDateString(parsed);
+                }
+            }
+
+            return null; // Invalid date
+        }
 
         // =================================================================
         // GOOGLE SHEETS SYNC FUNCTIONS
@@ -918,6 +957,9 @@
                 data = JSON.parse(saved);
             }
 
+            // Clean up any invalid/duplicate data first
+            cleanupData();
+
             // Merge preloaded data (only add entries that don't exist)
             if (PRELOADED_DATA) {
                 PRELOADED_DATA.sunrun.forEach(entry => {
@@ -956,6 +998,11 @@
                         // Merge sheet data (sheets wins for conflicts)
                         if (result.data.sunrun && result.data.sunrun.length > 0) {
                             result.data.sunrun.forEach(entry => {
+                                // Normalize the date from Google Sheets format
+                                const normalizedDate = normalizeDate(entry.date);
+                                if (!normalizedDate) return; // Skip invalid dates
+                                entry.date = normalizedDate;
+
                                 const existing = data.sunrun.findIndex(e => e.date === entry.date);
                                 if (existing >= 0) {
                                     data.sunrun[existing] = entry;
@@ -967,6 +1014,11 @@
                         }
                         if (result.data.sdge && result.data.sdge.length > 0) {
                             result.data.sdge.forEach(entry => {
+                                // Normalize the date from Google Sheets format
+                                const normalizedDate = normalizeDate(entry.date);
+                                if (!normalizedDate) return; // Skip invalid dates
+                                entry.date = normalizedDate;
+
                                 const existing = data.sdge.findIndex(e => e.date === entry.date);
                                 if (existing >= 0) {
                                     data.sdge[existing] = entry;
@@ -977,7 +1029,11 @@
                             });
                         }
                         if (result.data.activities && result.data.activities.length > 0) {
-                            data.activities = result.data.activities;
+                            // Normalize dates in activities too
+                            data.activities = result.data.activities.map(entry => {
+                                entry.date = normalizeDate(entry.date) || entry.date;
+                                return entry;
+                            }).filter(entry => entry.date);
                             hasChanges = true;
                         }
 
@@ -997,11 +1053,48 @@
             localStorage.setItem('solarTrackerData', JSON.stringify(data));
         }
 
-        // Save data to localStorage AND sync to Google Sheets
+        // Remove duplicate entries and invalid dates from data
+        function cleanupData() {
+            // De-duplicate sunrun by date (keep latest)
+            const sunrunMap = new Map();
+            data.sunrun.forEach(entry => {
+                const normalizedDate = normalizeDate(entry.date);
+                if (normalizedDate) {
+                    entry.date = normalizedDate;
+                    sunrunMap.set(entry.date, entry);
+                }
+            });
+            data.sunrun = Array.from(sunrunMap.values());
+
+            // De-duplicate sdge by date (keep latest)
+            const sdgeMap = new Map();
+            data.sdge.forEach(entry => {
+                const normalizedDate = normalizeDate(entry.date);
+                if (normalizedDate) {
+                    entry.date = normalizedDate;
+                    sdgeMap.set(entry.date, entry);
+                }
+            });
+            data.sdge = Array.from(sdgeMap.values());
+
+            // Clean activities dates
+            data.activities = data.activities.filter(entry => {
+                const normalizedDate = normalizeDate(entry.date);
+                if (normalizedDate) {
+                    entry.date = normalizedDate;
+                    return true;
+                }
+                return false;
+            });
+        }
+
+        // Save data to localStorage AND sync to Google Sheets (throttled)
         function saveData() {
             saveDataLocal();
-            // Sync to sheets in background (non-blocking)
-            if (SHEETS_API_URL) {
+            // Throttle sync to prevent continuous updates
+            const now = Date.now();
+            if (SHEETS_API_URL && (now - lastSyncTime) > SYNC_THROTTLE_MS) {
+                lastSyncTime = now;
                 syncToSheets('syncAll', { data: data });
             }
         }
