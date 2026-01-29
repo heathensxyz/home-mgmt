@@ -813,11 +813,15 @@
                 return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
             }
 
-            // ISO date string like "1899-12-30T08:00:00.000Z" (Google Sheets time-only)
-            if (typeof timeValue === 'string' && timeValue.includes('1899-12-30')) {
-                const match = timeValue.match(/T(\d{2}):(\d{2})/);
-                if (match) {
-                    return `${match[1]}:${match[2]}`;
+            // ISO date string from Google Sheets (e.g., "1899-12-30T08:00:00.000Z")
+            // Google Sheets serializes times as UTC, need to convert to local
+            if (typeof timeValue === 'string' && timeValue.includes('T')) {
+                const date = new Date(timeValue);
+                if (!isNaN(date.getTime())) {
+                    // getHours() returns local timezone hours
+                    const hours = date.getHours();
+                    const minutes = date.getMinutes();
+                    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
                 }
             }
 
