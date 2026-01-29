@@ -797,6 +797,52 @@
             return null; // Invalid date
         }
 
+        function normalizeTime(timeValue) {
+            if (!timeValue) return null;
+
+            // Already in HH:MM format
+            if (typeof timeValue === 'string' && /^\d{2}:\d{2}$/.test(timeValue)) {
+                return timeValue;
+            }
+
+            // Google Sheets time serial (fraction of day, e.g., 0.5 = 12:00)
+            if (typeof timeValue === 'number' && timeValue >= 0 && timeValue < 1) {
+                const totalMinutes = Math.round(timeValue * 24 * 60);
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            }
+
+            // ISO date string like "1899-12-30T08:00:00.000Z" (Google Sheets time-only)
+            if (typeof timeValue === 'string' && timeValue.includes('1899-12-30')) {
+                const match = timeValue.match(/T(\d{2}):(\d{2})/);
+                if (match) {
+                    return `${match[1]}:${match[2]}`;
+                }
+            }
+
+            // Regular time string like "8:00 AM" or "14:30"
+            if (typeof timeValue === 'string') {
+                // Try HH:MM:SS format
+                const hmsMatch = timeValue.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+                if (hmsMatch) {
+                    return `${hmsMatch[1].padStart(2, '0')}:${hmsMatch[2]}`;
+                }
+                // Try 12-hour format
+                const ampmMatch = timeValue.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+                if (ampmMatch) {
+                    let hours = parseInt(ampmMatch[1]);
+                    const minutes = ampmMatch[2];
+                    const isPM = ampmMatch[3].toUpperCase() === 'PM';
+                    if (isPM && hours !== 12) hours += 12;
+                    if (!isPM && hours === 12) hours = 0;
+                    return `${hours.toString().padStart(2, '0')}:${minutes}`;
+                }
+            }
+
+            return timeValue; // Return as-is if can't parse
+        }
+
         // =================================================================
         // GOOGLE SHEETS SYNC FUNCTIONS
         // =================================================================
@@ -896,7 +942,13 @@
                         });
                     }
                     if (result.data.activities) {
-                        data.activities = result.data.activities;
+                        // Normalize dates and times in activities
+                        data.activities = result.data.activities.map(entry => {
+                            entry.date = normalizeDate(entry.date) || entry.date;
+                            entry.start_time = normalizeTime(entry.start_time) || entry.start_time;
+                            entry.end_time = normalizeTime(entry.end_time) || entry.end_time;
+                            return entry;
+                        }).filter(entry => entry.date);
                     }
 
                     saveDataLocal();
@@ -1029,9 +1081,11 @@
                             });
                         }
                         if (result.data.activities && result.data.activities.length > 0) {
-                            // Normalize dates in activities too
+                            // Normalize dates and times in activities
                             data.activities = result.data.activities.map(entry => {
                                 entry.date = normalizeDate(entry.date) || entry.date;
+                                entry.start_time = normalizeTime(entry.start_time) || entry.start_time;
+                                entry.end_time = normalizeTime(entry.end_time) || entry.end_time;
                                 return entry;
                             }).filter(entry => entry.date);
                             hasChanges = true;
@@ -1077,11 +1131,13 @@
             });
             data.sdge = Array.from(sdgeMap.values());
 
-            // Clean activities dates
+            // Clean activities dates and times
             data.activities = data.activities.filter(entry => {
                 const normalizedDate = normalizeDate(entry.date);
                 if (normalizedDate) {
                     entry.date = normalizedDate;
+                    entry.start_time = normalizeTime(entry.start_time) || entry.start_time;
+                    entry.end_time = normalizeTime(entry.end_time) || entry.end_time;
                     return true;
                 }
                 return false;
