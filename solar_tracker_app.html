@@ -851,6 +851,16 @@
         // GOOGLE SHEETS SYNC FUNCTIONS
         // =================================================================
         function getSheetsApiUrl() {
+            // Check URL parameter first (allows bookmarkable links)
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiParam = urlParams.get('api');
+            if (apiParam) {
+                // Save to localStorage for future visits
+                localStorage.setItem('sheetsApiUrl', apiParam);
+                // Clean up URL (remove parameter) for cleaner sharing
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return apiParam;
+            }
             return localStorage.getItem('sheetsApiUrl') || '';
         }
 
