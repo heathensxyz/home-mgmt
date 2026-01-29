@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Power Tracker - Tay's Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        .tab-active { border-bottom: 3px solid #f59e0b; background: #fffbeb; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .rate-super-off-peak { background: #10b981; color: white; }
+        .rate-off-peak { background: #3b82f6; color: white; }
+        .rate-on-peak { background: #ef4444; color: white; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        input[type="date"], input[type="time"], input[type="number"], select {
+            border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px;
+        }
+        .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 24px;
+                 border-radius: 8px; z-index: 1000; animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-4 shadow-lg">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <div>
+                    <h1 class="text-2xl font-bold">Solar Power Tracker</h1>
+                    <p class="text-amber-100 text-sm">5.985 kW System | EV-TOU-5 Rate Plan</p>
+                </div>
+            </div>
+            <div class="text-right text-sm">
+                <div id="currentDate" class="font-semibold"></div>
+                <div id="currentPeriod" class="text-amber-100"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-white border-b sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto flex">
+            <button onclick="showTab('dashboard')" id="tab-dashboard" class="px-6 py-3 font-medium text-gray-600 hover:bg-amber-50 tab-active">
+                Dashboard
+            </button>
+            <button onclick="showTab('input')" id="tab-input" class="px-6 py-3 font-medium text-gray-600 hover:bg-amber-50">
+                Daily Input
+            </button>
+            <button onclick="showTab('activities')" id="tab-activities" class="px-6 py-3 font-medium text-gray-600 hover:bg-amber-50">
+                Activities
+            </button>
+            <button onclick="showTab('import')" id="tab-import" class="px-6 py-3 font-medium text-gray-600 hover:bg-amber-50">
+                Import Data
+            </button>
+            <button onclick="showTab('settings')" id="tab-settings" class="px-6 py-3 font-medium text-gray-600 hover:bg-amber-50">
+                Settings
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto p-4">
+
+        <!-- Dashboard Tab -->
+        <div id="content-dashboard" class="tab-content fade-in">
+            <!-- Anomaly Alert Banner (hidden by default) -->
+            <div id="anomalyAlert" class="hidden mb-4 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+                <div class="flex items-center">
+                    <svg class="w-6 h-6 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <div>
+                        <h4 class="font-bold text-red-700">Solar Production Anomaly Detected</h4>
+                        <p id="anomalyMessage" class="text-red-600 text-sm"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weather + Yesterday Summary Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                <!-- Weather Card -->
+                <div class="card p-4 bg-gradient-to-br from-sky-50 to-blue-50">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-gray-700">Encinitas Weather</h3>
+                        <span id="weatherIcon" class="text-3xl">☀️</span>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        <div class="flex justify-between py-1">
+                            <span>Yesterday:</span>
+                            <span id="weatherYesterday" class="font-medium">Loading...</span>
+                        </div>
+                        <div class="flex justify-between py-1">
+                            <span>Today:</span>
+                            <span id="weatherToday" class="font-medium">Loading...</span>
+                        </div>
+                        <div class="flex justify-between py-1">
+                            <span>Tomorrow:</span>
+                            <span id="weatherTomorrow" class="font-medium">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="mt-2 pt-2 border-t text-xs text-gray-500">
+                        <span id="weatherSolarForecast">Expected solar: calculating...</span>
+                    </div>
+                </div>
+
+                <!-- Yesterday's Summary (Primary) -->
+                <div class="lg:col-span-2">
+                    <div class="card p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-semibold">Yesterday's Summary</h3>
+                            <span id="yesterdayDate" class="text-sm text-gray-500"></span>
+                        </div>
+                        <div class="grid grid-cols-4 gap-4 text-center">
+                            <div>
+                                <div class="text-2xl font-bold text-amber-500" id="yesterdaySolar">--</div>
+                                <div class="text-xs text-gray-500">Solar kWh</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-blue-500" id="yesterdayImport">--</div>
+                                <div class="text-xs text-gray-500">Grid Import</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-green-500" id="yesterdayExport">--</div>
+                                <div class="text-xs text-gray-500">Grid Export</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-purple-500" id="yesterdayCost">--</div>
+                                <div class="text-xs text-gray-500">Net Cost</div>
+                            </div>
+                        </div>
+                        <div id="yesterdayWeatherNote" class="mt-3 pt-2 border-t text-sm text-gray-600"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Key Performance Metrics -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <!-- Self-Consumption Rate -->
+                <div class="card p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="text-gray-600 text-sm font-medium">Self-Consumption Rate</div>
+                        <div class="text-xs text-gray-400">Last 7 days</div>
+                    </div>
+                    <div class="flex items-end gap-3">
+                        <div class="text-3xl font-bold text-emerald-600" id="selfConsumptionRate">--%</div>
+                        <div class="text-sm text-gray-500 pb-1">of solar used directly</div>
+                    </div>
+                    <div class="mt-3 bg-gray-200 rounded-full h-2">
+                        <div id="selfConsumptionBar" class="bg-emerald-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500">
+                        <span id="selfConsumptionDetail">-- kWh used / -- kWh produced</span>
+                    </div>
+                    <div class="mt-1 text-xs text-emerald-600" id="selfConsumptionTip"></div>
+                </div>
+
+                <!-- Peak Avoidance Score -->
+                <div class="card p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="text-gray-600 text-sm font-medium">Peak Avoidance Score</div>
+                        <div class="text-xs text-gray-400">4-9pm usage</div>
+                    </div>
+                    <div class="flex items-end gap-3">
+                        <div class="text-3xl font-bold" id="peakAvoidanceScore">--%</div>
+                        <div class="text-sm text-gray-500 pb-1">powered by solar</div>
+                    </div>
+                    <div class="mt-3 flex gap-1 h-2">
+                        <div id="peakSolarBar" class="bg-amber-500 h-2 rounded-l-full transition-all" style="width: 0%"></div>
+                        <div id="peakGridBar" class="bg-red-400 h-2 rounded-r-full transition-all" style="width: 100%"></div>
+                    </div>
+                    <div class="mt-2 flex justify-between text-xs text-gray-500">
+                        <span id="peakSolarKwh">Solar: -- kWh</span>
+                        <span id="peakGridKwh">Grid: -- kWh</span>
+                    </div>
+                    <div class="mt-1 text-xs" id="peakAvoidanceSavings"></div>
+                </div>
+
+                <!-- Battery ROI Preview -->
+                <div class="card p-4 bg-gradient-to-br from-purple-50 to-indigo-50">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="text-gray-600 text-sm font-medium">🔋 Battery ROI Preview</div>
+                        <div class="text-xs text-gray-400">If you had storage</div>
+                    </div>
+                    <div class="flex items-end gap-3">
+                        <div class="text-3xl font-bold text-purple-600" id="batteryPotentialSavings">$--</div>
+                        <div class="text-sm text-gray-500 pb-1">potential monthly savings</div>
+                    </div>
+                    <div class="mt-3 text-xs text-gray-600">
+                        <div class="flex justify-between py-1 border-b border-purple-100">
+                            <span>Shiftable on-peak usage:</span>
+                            <span class="font-medium" id="batteryShiftableKwh">-- kWh</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-purple-100">
+                            <span>Rate arbitrage value:</span>
+                            <span class="font-medium" id="batteryArbitrageRate">28.6¢/kWh</span>
+                        </div>
+                        <div class="flex justify-between py-1">
+                            <span>Est. annual savings:</span>
+                            <span class="font-medium text-purple-600" id="batteryAnnualSavings">$--</span>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-xs text-purple-600" id="batteryPaybackNote"></div>
+                </div>
+            </div>
+
+            <!-- Current TOU Indicator (compact) -->
+            <div class="flex justify-end mb-4">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm" id="touIndicator">
+                    <span class="w-2 h-2 rounded-full" id="touDot"></span>
+                    <span id="touLabel">--</span>
+                    <span class="font-bold" id="touRateInline">--</span>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                <div class="card p-4">
+                    <h3 class="font-semibold mb-3">Solar Production (Last 14 Days)</h3>
+                    <canvas id="solarChart" height="200"></canvas>
+                </div>
+                <div class="card p-4">
+                    <h3 class="font-semibold mb-3">Daily Grid Cost vs Solar Savings</h3>
+                    <canvas id="costChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Monthly Summary -->
+            <div class="card p-4 mb-6">
+                <h3 class="font-semibold mb-3">Monthly Summary</h3>
+                <div class="grid grid-cols-2 md:grid-cols-6 gap-4 text-center">
+                    <div>
+                        <div class="text-2xl font-bold text-amber-500" id="monthSolar">--</div>
+                        <div class="text-xs text-gray-500">Solar kWh</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-blue-500" id="monthImport">--</div>
+                        <div class="text-xs text-gray-500">Import kWh</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-green-500" id="monthExport">--</div>
+                        <div class="text-xs text-gray-500">Export kWh</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold" id="monthSuperOffPeak">--</div>
+                        <div class="text-xs text-gray-500">Super Off-Peak</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold" id="monthOnPeak">--</div>
+                        <div class="text-xs text-gray-500">On-Peak</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-purple-500" id="monthCost">--</div>
+                        <div class="text-xs text-gray-500">Est. Cost</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rate Schedule Reference -->
+            <div class="card p-4">
+                <h3 class="font-semibold mb-3">EV-TOU-5 Rate Schedule (CEA Customer)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="rate-super-off-peak p-3 rounded-lg">
+                        <div class="font-bold">Super Off-Peak: 13.3¢/kWh</div>
+                        <div class="text-sm opacity-90">12am-6am daily</div>
+                        <div class="text-sm opacity-90">12am-2pm weekends</div>
+                    </div>
+                    <div class="rate-off-peak p-3 rounded-lg">
+                        <div class="font-bold">Off-Peak: 41.9¢/kWh</div>
+                        <div class="text-sm opacity-90">6am-4pm, 9pm-12am weekdays</div>
+                    </div>
+                    <div class="rate-on-peak p-3 rounded-lg">
+                        <div class="font-bold">On-Peak: 41.9¢/kWh</div>
+                        <div class="text-sm opacity-90">4pm-9pm daily</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Input Tab -->
+        <div id="content-input" class="tab-content hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Sunrun Production Input -->
+                <div class="card p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <span class="w-3 h-3 bg-amber-500 rounded-full"></span>
+                        Sunrun Solar Production
+                    </h3>
+                    <form id="sunrunForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Date</label>
+                            <input type="date" id="sunrunDate" class="w-full" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Production (kWh)</label>
+                            <input type="number" id="sunrunProduction" step="0.1" min="0" max="50"
+                                   placeholder="e.g., 22.5" class="w-full" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Notes (optional)</label>
+                            <input type="text" id="sunrunNotes" placeholder="e.g., Cloudy morning" class="w-full">
+                        </div>
+                        <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg font-medium">
+                            Save Solar Data
+                        </button>
+                    </form>
+
+                    <!-- Quick Entry for Multiple Days -->
+                    <div class="mt-6 pt-4 border-t">
+                        <h4 class="font-medium text-sm text-gray-600 mb-2">Quick Multi-Day Entry</h4>
+                        <div id="quickSunrunEntry" class="space-y-2 max-h-48 overflow-y-auto">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SDGE Daily Summary Input -->
+                <div class="card p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                        <span class="w-3 h-3 bg-blue-500 rounded-full"></span>
+                        SDGE Daily Summary
+                    </h3>
+                    <form id="sdgeForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Date</label>
+                            <input type="date" id="sdgeDate" class="w-full" required>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">Consumption (kWh)</label>
+                                <input type="number" id="sdgeConsumption" step="0.1" min="0"
+                                       placeholder="Total used" class="w-full" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">Generation (kWh)</label>
+                                <input type="number" id="sdgeGeneration" step="0.1" min="0"
+                                       placeholder="Solar export" class="w-full" required>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Super Off-Peak</label>
+                                <input type="number" id="sdgeSuperOffPeak" step="0.1" min="0"
+                                       placeholder="kWh" class="w-full text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Off-Peak</label>
+                                <input type="number" id="sdgeOffPeak" step="0.1" min="0"
+                                       placeholder="kWh" class="w-full text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">On-Peak</label>
+                                <input type="number" id="sdgeOnPeak" step="0.1" min="0"
+                                       placeholder="kWh" class="w-full text-sm">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg font-medium">
+                            Save SDGE Data
+                        </button>
+                    </form>
+
+                    <div class="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+                        <strong>Tip:</strong> You can also import SDGE CSV files directly in the Import tab for bulk data.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Entries -->
+            <div class="card p-6 mt-6">
+                <h3 class="font-semibold mb-4">Recent Entries</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="text-left p-2">Date</th>
+                                <th class="text-right p-2">Solar (kWh)</th>
+                                <th class="text-right p-2">Consumption</th>
+                                <th class="text-right p-2">Export</th>
+                                <th class="text-right p-2">Net Cost</th>
+                                <th class="text-center p-2">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentEntriesTable">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activities Tab -->
+        <div id="content-activities" class="tab-content hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Activity Input -->
+                <div class="card p-6">
+                    <h3 class="text-lg font-semibold mb-4">Log Activity</h3>
+                    <form id="activityForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Date</label>
+                            <input type="date" id="activityDate" class="w-full" required>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">Start Time</label>
+                                <input type="time" id="activityStart" class="w-full" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">End Time</label>
+                                <input type="time" id="activityEnd" class="w-full" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Activity</label>
+                            <select id="activityType" class="w-full" required>
+                                <option value="">Select activity...</option>
+                                <optgroup label="Laundry">
+                                    <option value="Laundry - Washer">Washer (0.5 kW)</option>
+                                    <option value="Laundry - Dryer">Dryer (3.0 kW)</option>
+                                </optgroup>
+                                <optgroup label="Kitchen">
+                                    <option value="Dishwasher">Dishwasher (1.8 kW)</option>
+                                    <option value="Oven/Stove">Oven/Stove (2.5 kW)</option>
+                                    <option value="Microwave">Microwave (1.2 kW)</option>
+                                </optgroup>
+                                <optgroup label="Electronics">
+                                    <option value="TV - Living Room">TV - Living Room (0.15 kW)</option>
+                                    <option value="TV - Bedroom">TV - Bedroom (0.1 kW)</option>
+                                    <option value="Computer/Desktop">Computer (0.3 kW)</option>
+                                    <option value="Gaming Console">Gaming Console (0.2 kW)</option>
+                                </optgroup>
+                                <optgroup label="Climate">
+                                    <option value="AC Running">AC (3.5 kW)</option>
+                                    <option value="Space Heater">Space Heater (1.5 kW)</option>
+                                </optgroup>
+                                <optgroup label="Other">
+                                    <option value="EV Charging">EV Charging (7.0 kW)</option>
+                                    <option value="Pool Pump">Pool Pump (1.5 kW)</option>
+                                    <option value="Hair Dryer">Hair Dryer (1.5 kW)</option>
+                                    <option value="Vacuum">Vacuum (1.0 kW)</option>
+                                    <option value="Hot Tub/Spa">Hot Tub (4.0 kW)</option>
+                                    <option value="Other">Other</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Location</label>
+                            <select id="activityLocation" class="w-full">
+                                <option value="">Select location...</option>
+                                <option value="Kitchen">Kitchen</option>
+                                <option value="Living Room">Living Room</option>
+                                <option value="Bedroom">Bedroom</option>
+                                <option value="Bathroom">Bathroom</option>
+                                <option value="Garage">Garage</option>
+                                <option value="Laundry Room">Laundry Room</option>
+                                <option value="Office">Office</option>
+                                <option value="Outside">Outside</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Notes</label>
+                            <input type="text" id="activityNotes" placeholder="Optional notes" class="w-full">
+                        </div>
+                        <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg font-medium">
+                            Log Activity
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Activity Summary -->
+                <div class="lg:col-span-2">
+                    <div class="card p-6 mb-4">
+                        <h3 class="font-semibold mb-3">Activity Impact Analysis</h3>
+                        <canvas id="activityChart" height="150"></canvas>
+                    </div>
+
+                    <div class="card p-6">
+                        <h3 class="font-semibold mb-3">Recent Activities</h3>
+                        <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th class="text-left p-2">Date</th>
+                                        <th class="text-left p-2">Time</th>
+                                        <th class="text-left p-2">Activity</th>
+                                        <th class="text-right p-2">Est. kWh</th>
+                                        <th class="text-right p-2">Est. Cost</th>
+                                        <th class="text-center p-2">TOU</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activityTable">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Tab -->
+        <div id="content-import" class="tab-content hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- SDGE Import -->
+                <div class="card p-6">
+                    <h3 class="text-lg font-semibold mb-4">Import SDGE Data</h3>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Upload your SDGE Green Button CSV export file. The system will automatically parse
+                        15-minute interval data and calculate TOU periods.
+                    </p>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-amber-400 transition-colors">
+                        <input type="file" id="sdgeFileInput" accept=".csv" class="hidden">
+                        <label for="sdgeFileInput" class="cursor-pointer">
+                            <svg class="w-12 h-12 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                            <span class="text-gray-600">Click to upload SDGE CSV</span>
+                        </label>
+                    </div>
+                    <div id="sdgeImportStatus" class="mt-4 hidden">
+                        <div class="bg-green-50 text-green-700 p-3 rounded-lg text-sm"></div>
+                    </div>
+                </div>
+
+                <!-- Sunrun Import -->
+                <div class="card p-6">
+                    <h3 class="text-lg font-semibold mb-4">Import Sunrun Data</h3>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Upload a CSV file with Sunrun production data. Expected columns: date, production_kwh
+                    </p>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-amber-400 transition-colors">
+                        <input type="file" id="sunrunFileInput" accept=".csv" class="hidden">
+                        <label for="sunrunFileInput" class="cursor-pointer">
+                            <svg class="w-12 h-12 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                            <span class="text-gray-600">Click to upload Sunrun CSV</span>
+                        </label>
+                    </div>
+                    <div id="sunrunImportStatus" class="mt-4 hidden">
+                        <div class="bg-green-50 text-green-700 p-3 rounded-lg text-sm"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Options -->
+            <div class="card p-6 mt-6">
+                <h3 class="font-semibold mb-4">Export Data</h3>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="exportData('all')" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
+                        Export All Data (JSON)
+                    </button>
+                    <button onclick="exportData('sunrun')" class="px-4 py-2 bg-amber-100 hover:bg-amber-200 rounded-lg text-sm">
+                        Export Sunrun (CSV)
+                    </button>
+                    <button onclick="exportData('sdge')" class="px-4 py-2 bg-blue-100 hover:bg-blue-200 rounded-lg text-sm">
+                        Export SDGE (CSV)
+                    </button>
+                    <button onclick="exportData('activities')" class="px-4 py-2 bg-green-100 hover:bg-green-200 rounded-lg text-sm">
+                        Export Activities (CSV)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="content-settings" class="tab-content hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="card p-6">
+                    <h3 class="text-lg font-semibold mb-4">System Configuration</h3>
+                    <form id="settingsForm" class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Solar System Size (kW)</label>
+                            <input type="number" id="settingSolarSize" step="0.001" value="5.985" class="w-full">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">Rate Plan</label>
+                            <select id="settingRatePlan" class="w-full">
+                                <option value="EV-TOU-5" selected>EV-TOU-5 (Recommended)</option>
+                                <option value="EV-TOU-2">EV-TOU-2</option>
+                                <option value="TOU-DR1">TOU-DR1</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600 mb-1">CCA Provider</label>
+                            <select id="settingCCA" class="w-full">
+                                <option value="CEA" selected>Clean Energy Alliance (CEA)</option>
+                                <option value="SDGE">SDG&E Bundled</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-lg font-medium">
+                            Save Settings
+                        </button>
+                    </form>
+                </div>
+
+                <div class="card p-6">
+                    <h3 class="text-lg font-semibold mb-4">Current Rates (EV-TOU-5 + CEA)</h3>
+                    <table class="w-full text-sm">
+                        <tr class="border-b">
+                            <td class="py-2">Super Off-Peak (12am-6am)</td>
+                            <td class="text-right font-mono">$0.133/kWh</td>
+                        </tr>
+                        <tr class="border-b">
+                            <td class="py-2">Off-Peak</td>
+                            <td class="text-right font-mono">$0.419/kWh</td>
+                        </tr>
+                        <tr class="border-b">
+                            <td class="py-2">On-Peak (4pm-9pm)</td>
+                            <td class="text-right font-mono">$0.419/kWh</td>
+                        </tr>
+                        <tr>
+                            <td class="py-2">Export Credit</td>
+                            <td class="text-right font-mono">$0.040/kWh</td>
+                        </tr>
+                    </table>
+
+                    <div class="mt-6 pt-4 border-t">
+                        <h4 class="font-medium mb-2">Data Management</h4>
+                        <button onclick="clearAllData()" class="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm">
+                            Clear All Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden bg-green-500 text-white"></div>
+
+    <script>
+        // =================================================================
+        // CONFIGURATION
+        // =================================================================
+        const CONFIG = {
+            solarCapacityKW: 5.985,
+            ratePlan: 'EV-TOU-5',
+            rates: {
+                super_off_peak: 0.133,  // 4.3¢ delivery + 9¢ generation
+                off_peak: 0.419,        // 32.9¢ delivery + 9¢ generation
+                on_peak: 0.419,         // 32.9¢ delivery + 9¢ generation
+            },
+            exportCredit: 0.04,
+            appliancePower: {
+                'Laundry - Washer': 0.5,
+                'Laundry - Dryer': 3.0,
+                'Dishwasher': 1.8,
+                'Oven/Stove': 2.5,
+                'Microwave': 1.2,
+                'TV - Living Room': 0.15,
+                'TV - Bedroom': 0.1,
+                'Computer/Desktop': 0.3,
+                'Gaming Console': 0.2,
+                'Hair Dryer': 1.5,
+                'Vacuum': 1.0,
+                'Pool Pump': 1.5,
+                'AC Running': 3.5,
+                'Space Heater': 1.5,
+                'EV Charging': 7.0,
+                'Hot Tub/Spa': 4.0,
+                'Other': 0.5,
+            }
+        };
+
+        // =================================================================
+        // DATA STORAGE
+        // =================================================================
+        let data = {
+            sunrun: [],      // { date, production_kwh, notes }
+            sdge: [],        // { date, consumption, generation, net, super_off_peak, off_peak, on_peak }
+            activities: [],  // { date, start_time, end_time, activity, location, notes, est_kwh }
+        };
+
+        // Preloaded data from CSV files (auto-generated)
+        const PRELOADED_DATA = {"sunrun":[{"date":"2025-12-27","production_kwh":19.8,"notes":"Browser automation extraction"},{"date":"2025-12-28","production_kwh":20.6,"notes":"Browser automation extraction"},{"date":"2025-12-29","production_kwh":21.6,"notes":"Browser automation extraction"},{"date":"2025-12-30","production_kwh":3.9,"notes":"Browser automation extraction"},{"date":"2025-12-31","production_kwh":1.8,"notes":"Browser automation extraction"},{"date":"2026-01-01","production_kwh":5.4,"notes":"Browser automation extraction"},{"date":"2026-01-02","production_kwh":10.7,"notes":"Browser automation extraction"},{"date":"2026-01-03","production_kwh":10.3,"notes":"Browser automation extraction"},{"date":"2026-01-04","production_kwh":11.4,"notes":"Browser automation extraction"},{"date":"2026-01-05","production_kwh":18.9,"notes":"Browser automation extraction"},{"date":"2026-01-06","production_kwh":10.0,"notes":"Browser automation extraction"},{"date":"2026-01-07","production_kwh":17.1,"notes":"Browser automation extraction"},{"date":"2026-01-08","production_kwh":19.4,"notes":"Browser automation extraction"},{"date":"2026-01-09","production_kwh":21.9,"notes":"Browser automation extraction"},{"date":"2026-01-10","production_kwh":22.6,"notes":"Browser automation extraction"},{"date":"2026-01-11","production_kwh":22.5,"notes":"Browser automation extraction"},{"date":"2026-01-12","production_kwh":21.8,"notes":"Browser automation extraction"},{"date":"2026-01-13","production_kwh":22.2,"notes":"Browser automation extraction"},{"date":"2026-01-14","production_kwh":22.0,"notes":"Browser automation extraction"},{"date":"2026-01-15","production_kwh":21.8,"notes":"Browser automation extraction"},{"date":"2026-01-16","production_kwh":22.4,"notes":"Browser automation extraction"},{"date":"2026-01-17","production_kwh":22.1,"notes":"Browser automation extraction"},{"date":"2026-01-18","production_kwh":20.4,"notes":"Browser automation extraction"},{"date":"2026-01-19","production_kwh":22.5,"notes":"Browser automation extraction"},{"date":"2026-01-20","production_kwh":20.3,"notes":"Browser automation extraction"},{"date":"2026-01-21","production_kwh":10.6,"notes":"Browser automation extraction"},{"date":"2026-01-22","production_kwh":11.2,"notes":"Browser automation extraction"},{"date":"2026-01-23","production_kwh":15.2,"notes":"Browser automation extraction"},{"date":"2026-01-24","production_kwh":12.6,"notes":"Browser automation extraction"},{"date":"2026-01-25","production_kwh":21.8,"notes":"Browser automation extraction"},{"date":"2026-01-26","production_kwh":17.1,"notes":"Browser automation extraction"}],"sdge":[{"date":"2026-01-02","consumption":18.535,"generation":4.84,"net":13.695,"super_off_peak":1.78,"off_peak":14.43,"on_peak":1.85},{"date":"2026-01-03","consumption":11.58,"generation":6.285,"net":5.295,"super_off_peak":2.37,"off_peak":3.54,"on_peak":5.52},{"date":"2026-01-04","consumption":10.88,"generation":6.735,"net":4.145,"super_off_peak":3.14,"off_peak":3.91,"on_peak":3.7},{"date":"2026-01-05","consumption":9.56,"generation":12.3,"net":-2.74,"super_off_peak":3.09,"off_peak":3.09,"on_peak":3.25},{"date":"2026-01-06","consumption":10.6,"generation":4.34,"net":6.26,"super_off_peak":3.32,"off_peak":3.63,"on_peak":3.43},{"date":"2026-01-07","consumption":12.5,"generation":11.59,"net":0.92,"super_off_peak":3.64,"off_peak":3.43,"on_peak":5.4},{"date":"2026-01-08","consumption":10.19,"generation":13.47,"net":-3.29,"super_off_peak":3.09,"off_peak":3.04,"on_peak":3.85},{"date":"2026-01-09","consumption":61.5,"generation":15.35,"net":46.16,"super_off_peak":52.67,"off_peak":4.86,"on_peak":3.89},{"date":"2026-01-10","consumption":27.4,"generation":8.0,"net":19.4,"super_off_peak":20.17,"off_peak":1.87,"on_peak":5.26},{"date":"2026-01-11","consumption":40.71,"generation":2.56,"net":38.14,"super_off_peak":25.81,"off_peak":5.73,"on_peak":8.88},{"date":"2026-01-12","consumption":21.59,"generation":7.52,"net":14.06,"super_off_peak":11.95,"off_peak":4.85,"on_peak":4.76},{"date":"2026-01-13","consumption":66.66,"generation":8.85,"net":57.81,"super_off_peak":57.06,"off_peak":3.39,"on_peak":6.11},{"date":"2026-01-14","consumption":18.62,"generation":8.36,"net":10.26,"super_off_peak":10.57,"off_peak":3.5,"on_peak":4.44},{"date":"2026-01-15","consumption":23.56,"generation":6.85,"net":16.71,"super_off_peak":13.11,"off_peak":4.98,"on_peak":5.14},{"date":"2026-01-16","consumption":11.0,"generation":8.61,"net":2.39,"super_off_peak":3.14,"off_peak":3.61,"on_peak":4.12},{"date":"2026-01-17","consumption":42.79,"generation":8.43,"net":34.36,"super_off_peak":16.35,"off_peak":9.46,"on_peak":16.78},{"date":"2026-01-18","consumption":29.87,"generation":2.8,"net":27.07,"super_off_peak":8.3,"off_peak":6.55,"on_peak":14.82},{"date":"2026-01-19","consumption":23.22,"generation":4.5,"net":18.72,"super_off_peak":4.72,"off_peak":6.23,"on_peak":12.22},{"date":"2026-01-20","consumption":27.53,"generation":3.72,"net":23.81,"super_off_peak":4.9,"off_peak":9.17,"on_peak":13.42},{"date":"2026-01-21","consumption":44.15,"generation":0.01,"net":44.14,"super_off_peak":14.2,"off_peak":15.87,"on_peak":14.08},{"date":"2026-01-22","consumption":34.47,"generation":1.18,"net":33.29,"super_off_peak":6.85,"off_peak":13.48,"on_peak":13.45},{"date":"2026-01-23","consumption":27.83,"generation":2.05,"net":25.79,"super_off_peak":4.56,"off_peak":9.43,"on_peak":13.31},{"date":"2026-01-24","consumption":35.44,"generation":1.82,"net":33.63,"super_off_peak":12.5,"off_peak":8.96,"on_peak":13.73},{"date":"2026-01-25","consumption":27.35,"generation":3.76,"net":23.59,"super_off_peak":6.96,"off_peak":6.07,"on_peak":14.01},{"date":"2026-01-26","consumption":24.69,"generation":4.94,"net":19.75,"super_off_peak":4.29,"off_peak":8.12,"on_peak":12.0}],"activities":[]};
+
+        // Load data from localStorage, merge with preloaded data
+        function loadData() {
+            const saved = localStorage.getItem('solarTrackerData');
+            if (saved) {
+                data = JSON.parse(saved);
+            }
+
+            // Merge preloaded data (only add entries that don't exist)
+            if (PRELOADED_DATA) {
+                PRELOADED_DATA.sunrun.forEach(entry => {
+                    if (!data.sunrun.find(e => e.date === entry.date)) {
+                        data.sunrun.push(entry);
+                    }
+                });
+                PRELOADED_DATA.sdge.forEach(entry => {
+                    if (!data.sdge.find(e => e.date === entry.date)) {
+                        data.sdge.push(entry);
+                    }
+                });
+                // Save merged data
+                if (data.sunrun.length > 0 || data.sdge.length > 0) {
+                    saveData();
+                }
+            }
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('solarTrackerData', JSON.stringify(data));
+        }
+
+        // =================================================================
+        // DATE HELPERS (timezone-safe)
+        // =================================================================
+        function getLocalDateString(date = new Date()) {
+            // Returns YYYY-MM-DD in local timezone (not UTC)
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getYesterdayString() {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            return getLocalDateString(yesterday);
+        }
+
+        function getTomorrowString() {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return getLocalDateString(tomorrow);
+        }
+
+        // =================================================================
+        // TOU PERIOD CALCULATION
+        // =================================================================
+        function getTOUPeriod(dateStr, timeStr) {
+            const dt = new Date(dateStr + 'T' + timeStr);
+            const hour = dt.getHours();
+            const dayOfWeek = dt.getDay();
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const month = dt.getMonth() + 1;
+            const isSpring = month === 3 || month === 4;
+
+            // Super off-peak: midnight to 6am (all days)
+            if (hour >= 0 && hour < 6) return 'super_off_peak';
+
+            // Super off-peak: weekends 6am-2pm
+            if (isWeekend && hour >= 6 && hour < 14) return 'super_off_peak';
+
+            // Super off-peak: spring weekdays 10am-2pm
+            if (isSpring && !isWeekend && hour >= 10 && hour < 14) return 'super_off_peak';
+
+            // On-peak: 4pm-9pm every day
+            if (hour >= 16 && hour < 21) return 'on_peak';
+
+            // Everything else is off-peak
+            return 'off_peak';
+        }
+
+        function getCurrentTOUPeriod() {
+            const now = new Date();
+            const dateStr = getLocalDateString(now);
+            const timeStr = now.toTimeString().slice(0, 5);
+            return getTOUPeriod(dateStr, timeStr);
+        }
+
+        // =================================================================
+        // WEATHER API (Open-Meteo - Free, no API key needed)
+        // =================================================================
+        let weatherData = { yesterday: null, today: null, tomorrow: null, historicalByDate: {} };
+
+        async function fetchWeather() {
+            try {
+                // Encinitas, CA coordinates
+                const lat = 33.0370;
+                const lon = -117.2920;
+
+                // Use local dates for proper timezone handling
+                const today = getLocalDateString();
+                const yesterday = getYesterdayString();
+                const tomorrow = getTomorrowString();
+
+                console.log('Fetching weather for dates:', { yesterday, today, tomorrow });
+
+                // Fetch forecast with past_days=14 to ensure we have historical data
+                const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,sunshine_duration,precipitation_sum,temperature_2m_max&timezone=America/Los_Angeles&temperature_unit=fahrenheit&past_days=14&forecast_days=3`;
+
+                const response = await fetch(forecastUrl);
+
+                if (!response.ok) {
+                    throw new Error(`Weather API returned ${response.status}`);
+                }
+
+                const forecast = await response.json();
+                console.log('Weather API response:', forecast);
+
+                if (forecast.daily && forecast.daily.time) {
+                    const dates = forecast.daily.time;
+                    const weatherCodes = forecast.daily.weather_code; // Note: API uses weather_code not weathercode
+                    const sunshine = forecast.daily.sunshine_duration; // seconds
+                    const precipitation = forecast.daily.precipitation_sum;
+                    const temps = forecast.daily.temperature_2m_max;
+
+                    console.log('Weather dates received:', dates);
+
+                    // Store historical data for analysis
+                    dates.forEach((date, i) => {
+                        weatherData.historicalByDate[date] = {
+                            code: weatherCodes[i],
+                            sunshine_hours: (sunshine[i] || 0) / 3600,
+                            precipitation: precipitation[i] || 0,
+                            temp_max: temps[i],
+                            condition: getWeatherCondition(weatherCodes[i]),
+                            expected_solar_factor: getSolarFactor(weatherCodes[i], (sunshine[i] || 0) / 3600),
+                        };
+                    });
+
+                    // Set specific days
+                    if (weatherData.historicalByDate[yesterday]) {
+                        weatherData.yesterday = weatherData.historicalByDate[yesterday];
+                    }
+                    if (weatherData.historicalByDate[today]) {
+                        weatherData.today = weatherData.historicalByDate[today];
+                    }
+                    if (weatherData.historicalByDate[tomorrow]) {
+                        weatherData.tomorrow = weatherData.historicalByDate[tomorrow];
+                    }
+
+                    console.log('Weather data processed:', {
+                        yesterday: weatherData.yesterday,
+                        today: weatherData.today,
+                        tomorrow: weatherData.tomorrow
+                    });
+
+                    updateWeatherDisplay();
+                    checkForAnomalies();
+                } else {
+                    console.error('Weather API response missing daily data:', forecast);
+                    throw new Error('Invalid weather data format');
+                }
+            } catch (error) {
+                console.error('Weather fetch error:', error);
+                document.getElementById('weatherYesterday').textContent = 'Unable to load';
+                document.getElementById('weatherToday').textContent = 'Unable to load';
+                document.getElementById('weatherTomorrow').textContent = 'Unable to load';
+            }
+        }
+
+        function getWeatherCondition(code) {
+            // WMO Weather interpretation codes
+            const conditions = {
+                0: 'Clear', 1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
+                45: 'Fog', 48: 'Fog', 51: 'Light Drizzle', 53: 'Drizzle', 55: 'Heavy Drizzle',
+                61: 'Light Rain', 63: 'Rain', 65: 'Heavy Rain', 71: 'Light Snow', 73: 'Snow',
+                75: 'Heavy Snow', 80: 'Rain Showers', 81: 'Rain Showers', 82: 'Heavy Showers',
+                95: 'Thunderstorm', 96: 'Thunderstorm', 99: 'Thunderstorm'
+            };
+            return conditions[code] || 'Unknown';
+        }
+
+        function getWeatherIcon(code) {
+            if (code === 0 || code === 1) return '☀️';
+            if (code === 2) return '⛅';
+            if (code === 3) return '☁️';
+            if (code >= 45 && code <= 48) return '🌫️';
+            if (code >= 51 && code <= 67) return '🌧️';
+            if (code >= 71 && code <= 77) return '❄️';
+            if (code >= 80 && code <= 82) return '🌦️';
+            if (code >= 95) return '⛈️';
+            return '🌤️';
+        }
+
+        function getSolarFactor(code, sunshineHours) {
+            // Expected solar production factor (0-1) based on weather
+            // 5.985 kW system in January should produce ~22-27 kWh on clear days
+            let factor = 1.0;
+
+            // Adjust by weather code
+            if (code === 0 || code === 1) factor = 1.0;        // Clear
+            else if (code === 2) factor = 0.85;                 // Partly cloudy
+            else if (code === 3) factor = 0.5;                  // Overcast
+            else if (code >= 45 && code <= 48) factor = 0.3;    // Fog
+            else if (code >= 51 && code <= 67) factor = 0.25;   // Rain
+            else if (code >= 71 && code <= 77) factor = 0.2;    // Snow
+            else if (code >= 80 && code <= 82) factor = 0.35;   // Showers
+            else if (code >= 95) factor = 0.15;                 // Thunderstorm
+
+            // Adjust by sunshine hours if available (0-12 hours typical)
+            if (sunshineHours > 0) {
+                const sunFactor = Math.min(sunshineHours / 10, 1.0);
+                factor = (factor + sunFactor) / 2; // Average both factors
+            }
+
+            return factor;
+        }
+
+        function getExpectedSolar(factor, month = new Date().getMonth() + 1) {
+            // Base expected production for 5.985 kW system by month (kWh/day)
+            const monthlyBase = {
+                1: 22, 2: 25, 3: 30, 4: 33, 5: 35, 6: 36,
+                7: 35, 8: 34, 9: 31, 10: 27, 11: 23, 12: 21
+            };
+            return monthlyBase[month] * factor;
+        }
+
+        function updateWeatherDisplay() {
+            if (weatherData.today) {
+                document.getElementById('weatherIcon').textContent = getWeatherIcon(weatherData.today.code);
+                document.getElementById('weatherToday').textContent =
+                    `${weatherData.today.condition}, ${weatherData.today.temp_max?.toFixed(0) || '--'}°F`;
+            }
+
+            if (weatherData.yesterday) {
+                document.getElementById('weatherYesterday').textContent =
+                    `${weatherData.yesterday.condition}, ${weatherData.yesterday.sunshine_hours?.toFixed(1) || '--'}h sun`;
+
+                // Update yesterday's weather note
+                const expectedSolar = getExpectedSolar(weatherData.yesterday.expected_solar_factor);
+                document.getElementById('yesterdayWeatherNote').innerHTML =
+                    `<span class="text-gray-500">Weather:</span> ${weatherData.yesterday.condition} ` +
+                    `(${weatherData.yesterday.sunshine_hours?.toFixed(1)}h sunshine) — ` +
+                    `<span class="text-amber-600">Expected ~${expectedSolar.toFixed(0)} kWh</span>`;
+            }
+
+            if (weatherData.tomorrow) {
+                document.getElementById('weatherTomorrow').textContent =
+                    `${weatherData.tomorrow.condition}, ${weatherData.tomorrow.temp_max?.toFixed(0) || '--'}°F`;
+
+                const expectedTomorrow = getExpectedSolar(weatherData.tomorrow.expected_solar_factor);
+                document.getElementById('weatherSolarForecast').textContent =
+                    `Tomorrow expected: ~${expectedTomorrow.toFixed(0)} kWh`;
+            }
+        }
+
+        // =================================================================
+        // ANOMALY DETECTION
+        // =================================================================
+        function checkForAnomalies() {
+            const alerts = [];
+
+            // Get last 14 days of solar data
+            const recentSolar = [...data.sunrun]
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 14);
+
+            if (recentSolar.length < 3) return; // Need at least 3 days of data
+
+            // Check each day against expected production
+            recentSolar.forEach(day => {
+                const weather = weatherData.historicalByDate[day.date];
+                if (!weather) return;
+
+                const expected = getExpectedSolar(weather.expected_solar_factor);
+                const actual = day.production_kwh;
+                const ratio = actual / expected;
+
+                // Flag if production is significantly below expected (accounting for weather)
+                if (ratio < 0.6 && weather.expected_solar_factor > 0.5) {
+                    // Production is less than 60% of expected on a decent weather day
+                    alerts.push({
+                        date: day.date,
+                        actual: actual,
+                        expected: expected,
+                        weather: weather.condition,
+                        ratio: ratio,
+                        severity: ratio < 0.4 ? 'high' : 'medium'
+                    });
+                }
+            });
+
+            // Check for sudden drops (compared to previous day)
+            for (let i = 0; i < recentSolar.length - 1; i++) {
+                const today = recentSolar[i];
+                const yesterday = recentSolar[i + 1];
+                const todayWeather = weatherData.historicalByDate[today.date];
+                const yesterdayWeather = weatherData.historicalByDate[yesterday.date];
+
+                if (!todayWeather || !yesterdayWeather) continue;
+
+                // If weather was similar but production dropped significantly
+                const weatherDiff = Math.abs(todayWeather.expected_solar_factor - yesterdayWeather.expected_solar_factor);
+                const productionDrop = (yesterday.production_kwh - today.production_kwh) / yesterday.production_kwh;
+
+                if (weatherDiff < 0.2 && productionDrop > 0.4) {
+                    // Weather was similar but production dropped 40%+
+                    const existingAlert = alerts.find(a => a.date === today.date);
+                    if (!existingAlert) {
+                        alerts.push({
+                            date: today.date,
+                            actual: today.production_kwh,
+                            expected: yesterday.production_kwh * (todayWeather.expected_solar_factor / yesterdayWeather.expected_solar_factor),
+                            weather: todayWeather.condition,
+                            ratio: today.production_kwh / yesterday.production_kwh,
+                            severity: 'medium',
+                            type: 'sudden_drop'
+                        });
+                    }
+                }
+            }
+
+            // Check for consistently low production over multiple days
+            const last7Days = recentSolar.slice(0, 7);
+            const avgRatio = last7Days.reduce((sum, day) => {
+                const weather = weatherData.historicalByDate[day.date];
+                if (!weather) return sum;
+                const expected = getExpectedSolar(weather.expected_solar_factor);
+                return sum + (day.production_kwh / expected);
+            }, 0) / last7Days.length;
+
+            if (avgRatio < 0.7 && last7Days.length >= 5) {
+                alerts.push({
+                    date: 'last7days',
+                    severity: 'high',
+                    type: 'consistent_underperformance',
+                    avgRatio: avgRatio
+                });
+            }
+
+            // Display alerts
+            displayAnomalyAlerts(alerts);
+        }
+
+        function displayAnomalyAlerts(alerts) {
+            const alertDiv = document.getElementById('anomalyAlert');
+            const messageDiv = document.getElementById('anomalyMessage');
+
+            if (alerts.length === 0) {
+                alertDiv.classList.add('hidden');
+                return;
+            }
+
+            // Show the most severe alert
+            const highSeverity = alerts.filter(a => a.severity === 'high');
+            const alert = highSeverity.length > 0 ? highSeverity[0] : alerts[0];
+
+            let message = '';
+            if (alert.type === 'consistent_underperformance') {
+                message = `Your solar panels have been producing ${((1 - alert.avgRatio) * 100).toFixed(0)}% below expected ` +
+                          `for the past week, even accounting for weather. This may indicate a system issue — ` +
+                          `consider checking for shading, dirt buildup, or contacting Sunrun.`;
+            } else if (alert.type === 'sudden_drop') {
+                message = `On ${formatDate(alert.date)}, production dropped unexpectedly to ${alert.actual.toFixed(1)} kWh ` +
+                          `despite similar weather (${alert.weather}). Check for new shading or equipment issues.`;
+            } else {
+                message = `On ${formatDate(alert.date)}, production was only ${alert.actual.toFixed(1)} kWh ` +
+                          `(expected ~${alert.expected.toFixed(0)} kWh based on ${alert.weather} weather). ` +
+                          `Production was ${((1 - alert.ratio) * 100).toFixed(0)}% below normal.`;
+            }
+
+            messageDiv.textContent = message;
+            alertDiv.classList.remove('hidden');
+        }
+
+        // =================================================================
+        // UI HELPERS
+        // =================================================================
+        function showTab(tabName) {
+            // Hide all content
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            // Remove active from all tabs
+            document.querySelectorAll('nav button').forEach(el => el.classList.remove('tab-active'));
+            // Show selected content
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            // Activate tab
+            document.getElementById('tab-' + tabName).classList.add('tab-active');
+
+            // Refresh data if dashboard
+            if (tabName === 'dashboard') refreshDashboard();
+            if (tabName === 'input') refreshRecentEntries();
+            if (tabName === 'activities') refreshActivities();
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white`;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        function formatDate(dateStr) {
+            // Add T12:00:00 to avoid timezone issues (parsing as noon local time)
+            const d = new Date(dateStr + 'T12:00:00');
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        // =================================================================
+        // DASHBOARD
+        // =================================================================
+        let solarChart, costChart, activityChart;
+
+        function refreshDashboard() {
+            updateCurrentTime();
+            updateYesterdaySummary();
+            updateKeyMetrics();
+            updateCharts();
+            updateMonthlySummary();
+            fetchWeather(); // Fetch weather data
+        }
+
+        function updateCurrentTime() {
+            const now = new Date();
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+
+            const period = getCurrentTOUPeriod();
+            const periodLabels = {
+                'super_off_peak': 'Super Off-Peak',
+                'off_peak': 'Off-Peak',
+                'on_peak': 'On-Peak'
+            };
+            const periodRates = {
+                'super_off_peak': '13.3¢',
+                'off_peak': '41.9¢',
+                'on_peak': '41.9¢'
+            };
+            const periodColors = {
+                'super_off_peak': { bg: 'bg-green-100', text: 'text-green-700', dot: 'bg-green-500' },
+                'off_peak': { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
+                'on_peak': { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' }
+            };
+            document.getElementById('currentPeriod').textContent = periodLabels[period] + ' - ' + periodRates[period];
+
+            // Update compact TOU indicator
+            const colors = periodColors[period];
+            document.getElementById('touIndicator').className = `inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${colors.bg} ${colors.text}`;
+            document.getElementById('touDot').className = `w-2 h-2 rounded-full ${colors.dot}`;
+            document.getElementById('touLabel').textContent = periodLabels[period];
+            document.getElementById('touRateInline').textContent = periodRates[period];
+        }
+
+        // =================================================================
+        // KEY PERFORMANCE METRICS
+        // =================================================================
+        function updateKeyMetrics() {
+            updateSelfConsumptionRate();
+            updatePeakAvoidanceScore();
+            updateBatteryROIPreview();
+        }
+
+        function updateSelfConsumptionRate() {
+            // Calculate for last 7 days where we have both solar and SDGE data
+            const last7Days = getLastNDaysWithBothData(7);
+
+            if (last7Days.length === 0) {
+                document.getElementById('selfConsumptionRate').textContent = '--%';
+                return;
+            }
+
+            let totalSolarProduced = 0;
+            let totalExported = 0;
+
+            last7Days.forEach(day => {
+                totalSolarProduced += day.sunrun.production_kwh;
+                totalExported += day.sdge.generation || 0;
+            });
+
+            const totalSelfConsumed = totalSolarProduced - totalExported;
+            const selfConsumptionRate = totalSolarProduced > 0 ? (totalSelfConsumed / totalSolarProduced) * 100 : 0;
+
+            document.getElementById('selfConsumptionRate').textContent = selfConsumptionRate.toFixed(0) + '%';
+            document.getElementById('selfConsumptionBar').style.width = selfConsumptionRate + '%';
+            document.getElementById('selfConsumptionDetail').textContent =
+                `${totalSelfConsumed.toFixed(1)} kWh used / ${totalSolarProduced.toFixed(1)} kWh produced`;
+
+            // Color and tip based on rate
+            const rateEl = document.getElementById('selfConsumptionRate');
+            const tipEl = document.getElementById('selfConsumptionTip');
+            if (selfConsumptionRate >= 70) {
+                rateEl.className = 'text-3xl font-bold text-emerald-600';
+                tipEl.textContent = '✓ Excellent! You\'re using most of your solar directly.';
+            } else if (selfConsumptionRate >= 50) {
+                rateEl.className = 'text-3xl font-bold text-amber-600';
+                tipEl.textContent = '→ Consider shifting more usage to midday hours.';
+            } else {
+                rateEl.className = 'text-3xl font-bold text-red-500';
+                tipEl.textContent = '⚠ Low self-consumption. A battery could help capture more value.';
+            }
+        }
+
+        function updatePeakAvoidanceScore() {
+            // Calculate for last 7 days
+            const last7Days = getLastNDaysWithBothData(7);
+
+            if (last7Days.length === 0) {
+                document.getElementById('peakAvoidanceScore').textContent = '--%';
+                return;
+            }
+
+            let totalOnPeakUsage = 0;
+            let totalOnPeakFromSolar = 0;
+
+            last7Days.forEach(day => {
+                const onPeakGrid = day.sdge.on_peak || 0;
+                totalOnPeakUsage += onPeakGrid;
+
+                // Estimate solar contribution during peak (4-9pm)
+                // This is approximate - solar typically contributes less during these hours
+                // We'll estimate based on production and export patterns
+                const solarProduction = day.sunrun.production_kwh;
+                const exported = day.sdge.generation || 0;
+                const selfConsumed = solarProduction - exported;
+
+                // Assume roughly 15% of self-consumed solar happens during on-peak (4-9pm is ~20% of daylight)
+                const estimatedPeakSolar = selfConsumed * 0.15;
+                totalOnPeakFromSolar += estimatedPeakSolar;
+            });
+
+            const totalPeakDemand = totalOnPeakUsage + totalOnPeakFromSolar;
+            const peakAvoidanceRate = totalPeakDemand > 0 ? (totalOnPeakFromSolar / totalPeakDemand) * 100 : 0;
+            const gridPercentage = 100 - peakAvoidanceRate;
+
+            document.getElementById('peakAvoidanceScore').textContent = peakAvoidanceRate.toFixed(0) + '%';
+            document.getElementById('peakSolarBar').style.width = peakAvoidanceRate + '%';
+            document.getElementById('peakGridBar').style.width = gridPercentage + '%';
+            document.getElementById('peakSolarKwh').textContent = `Solar: ${totalOnPeakFromSolar.toFixed(1)} kWh`;
+            document.getElementById('peakGridKwh').textContent = `Grid: ${totalOnPeakUsage.toFixed(1)} kWh`;
+
+            // Calculate cost impact
+            const peakGridCost = totalOnPeakUsage * CONFIG.rates.on_peak;
+            const savingsEl = document.getElementById('peakAvoidanceSavings');
+            savingsEl.textContent = `Grid cost during peak: $${peakGridCost.toFixed(2)} (${last7Days.length} days)`;
+            savingsEl.className = 'mt-1 text-xs text-red-600';
+
+            // Color based on score
+            const scoreEl = document.getElementById('peakAvoidanceScore');
+            if (peakAvoidanceRate >= 50) {
+                scoreEl.className = 'text-3xl font-bold text-emerald-600';
+            } else if (peakAvoidanceRate >= 25) {
+                scoreEl.className = 'text-3xl font-bold text-amber-600';
+            } else {
+                scoreEl.className = 'text-3xl font-bold text-red-500';
+            }
+        }
+
+        function updateBatteryROIPreview() {
+            // Calculate potential battery savings based on actual on-peak usage
+            const last30Days = [...data.sdge]
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 30);
+
+            if (last30Days.length === 0) {
+                document.getElementById('batteryPotentialSavings').textContent = '$--';
+                return;
+            }
+
+            // Sum up on-peak usage that could be shifted
+            const totalOnPeak = last30Days.reduce((sum, d) => sum + (d.on_peak || 0), 0);
+            const daysOfData = last30Days.length;
+
+            // Rate arbitrage: on-peak (41.9¢) vs super-off-peak (13.3¢) = 28.6¢ savings per kWh
+            const arbitrageRate = CONFIG.rates.on_peak - CONFIG.rates.super_off_peak;
+            const monthlySavings = (totalOnPeak / daysOfData) * 30 * arbitrageRate;
+            const annualSavings = monthlySavings * 12;
+
+            document.getElementById('batteryPotentialSavings').textContent = '$' + monthlySavings.toFixed(0);
+            document.getElementById('batteryShiftableKwh').textContent = (totalOnPeak / daysOfData * 30).toFixed(0) + ' kWh/mo';
+            document.getElementById('batteryArbitrageRate').textContent = (arbitrageRate * 100).toFixed(1) + '¢/kWh';
+            document.getElementById('batteryAnnualSavings').textContent = '$' + annualSavings.toFixed(0);
+
+            // Payback estimate
+            const batteryCost = 12000; // Assume mid-range battery cost
+            const paybackYears = batteryCost / annualSavings;
+            const noteEl = document.getElementById('batteryPaybackNote');
+            if (paybackYears <= 7) {
+                noteEl.textContent = `Est. ${paybackYears.toFixed(1)} year payback on $12k battery`;
+                noteEl.className = 'mt-2 text-xs text-emerald-600';
+            } else if (paybackYears <= 12) {
+                noteEl.textContent = `Est. ${paybackYears.toFixed(1)} year payback - consider SGIP rebates`;
+                noteEl.className = 'mt-2 text-xs text-amber-600';
+            } else {
+                noteEl.textContent = `${paybackYears.toFixed(0)}+ year payback - battery may not be cost-effective yet`;
+                noteEl.className = 'mt-2 text-xs text-gray-500';
+            }
+        }
+
+        function getLastNDaysWithBothData(n) {
+            // Get days where we have both Sunrun and SDGE data
+            const result = [];
+            const sortedSunrun = [...data.sunrun].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            for (const sunrunDay of sortedSunrun) {
+                const sdgeDay = data.sdge.find(d => d.date === sunrunDay.date);
+                if (sdgeDay) {
+                    result.push({ sunrun: sunrunDay, sdge: sdgeDay });
+                    if (result.length >= n) break;
+                }
+            }
+            return result;
+        }
+
+        function updateYesterdaySummary() {
+            const yesterday = getYesterdayString();
+            console.log('Looking for yesterday data:', yesterday);
+            console.log('Available sunrun dates:', data.sunrun.map(d => d.date).slice(-5));
+            console.log('Available SDGE dates:', data.sdge.map(d => d.date).slice(-5));
+
+            // Format yesterday's date for display
+            const yesterdayDate = new Date(yesterday + 'T12:00:00'); // Add noon to avoid timezone issues
+            document.getElementById('yesterdayDate').textContent = yesterdayDate.toLocaleDateString('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric'
+            });
+
+            // Yesterday's solar
+            const yesterdaySunrun = data.sunrun.find(d => d.date === yesterday);
+            console.log('Found sunrun data:', yesterdaySunrun);
+            document.getElementById('yesterdaySolar').textContent = yesterdaySunrun ?
+                yesterdaySunrun.production_kwh.toFixed(1) : '--';
+
+            // Yesterday's SDGE
+            const yesterdaySDGE = data.sdge.find(d => d.date === yesterday);
+            console.log('Found SDGE data:', yesterdaySDGE);
+            if (yesterdaySDGE) {
+                document.getElementById('yesterdayImport').textContent = (yesterdaySDGE.consumption || 0).toFixed(1);
+                document.getElementById('yesterdayExport').textContent = (yesterdaySDGE.generation || 0).toFixed(1);
+
+                // Calculate cost
+                const importCost = (yesterdaySDGE.super_off_peak || 0) * CONFIG.rates.super_off_peak +
+                                   (yesterdaySDGE.off_peak || 0) * CONFIG.rates.off_peak +
+                                   (yesterdaySDGE.on_peak || 0) * CONFIG.rates.on_peak;
+                const exportCredit = (yesterdaySDGE.generation || 0) * CONFIG.exportCredit;
+                const netCost = importCost - exportCredit;
+                document.getElementById('yesterdayCost').textContent = '$' + netCost.toFixed(2);
+            } else {
+                document.getElementById('yesterdayImport').textContent = '--';
+                document.getElementById('yesterdayExport').textContent = '--';
+                document.getElementById('yesterdayCost').textContent = '--';
+            }
+        }
+
+        function updateCharts() {
+            // Solar Production Chart (Last 14 days for better readability)
+            const last14Days = [...data.sunrun]
+                .sort((a, b) => new Date(a.date) - new Date(b.date))
+                .slice(-14);
+
+            // Calculate expected production based on weather
+            const expectedProduction = last14Days.map(d => {
+                const weather = weatherData.historicalByDate[d.date];
+                if (weather) {
+                    return getExpectedSolar(weather.expected_solar_factor);
+                }
+                return null;
+            });
+
+            // Color bars based on performance vs expected
+            const barColors = last14Days.map((d, i) => {
+                const expected = expectedProduction[i];
+                if (!expected) return '#f59e0b'; // Default amber
+
+                const ratio = d.production_kwh / expected;
+                if (ratio >= 0.9) return '#10b981';      // Green - good
+                if (ratio >= 0.7) return '#f59e0b';      // Amber - ok
+                if (ratio >= 0.5) return '#f97316';      // Orange - below expected
+                return '#ef4444';                         // Red - significantly low
+            });
+
+            const solarCtx = document.getElementById('solarChart').getContext('2d');
+            if (solarChart) solarChart.destroy();
+            solarChart = new Chart(solarCtx, {
+                type: 'bar',
+                data: {
+                    labels: last14Days.map(d => formatDate(d.date)),
+                    datasets: [
+                        {
+                            label: 'Solar (kWh)',
+                            data: last14Days.map(d => d.production_kwh),
+                            backgroundColor: barColors,
+                            borderRadius: 4,
+                            order: 2,
+                        },
+                        {
+                            label: 'Expected',
+                            data: expectedProduction,
+                            type: 'line',
+                            borderColor: '#9ca3af',
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            order: 1,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                afterBody: function(context) {
+                                    const idx = context[0].dataIndex;
+                                    const date = last14Days[idx].date;
+                                    const weather = weatherData.historicalByDate[date];
+                                    if (weather) {
+                                        return `Weather: ${weather.condition}`;
+                                    }
+                                    return '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'kWh' } }
+                    }
+                }
+            });
+
+            // Cost vs Savings Chart (Last 14 days)
+            const costData = calculateDailyCostSavings();
+            const costCtx = document.getElementById('costChart').getContext('2d');
+            if (costChart) costChart.destroy();
+            costChart = new Chart(costCtx, {
+                type: 'bar',
+                data: {
+                    labels: costData.labels,
+                    datasets: [
+                        {
+                            label: 'Grid Cost ($)',
+                            data: costData.gridCosts,
+                            backgroundColor: '#ef4444',
+                            borderRadius: 4,
+                            stack: 'costs',
+                        },
+                        {
+                            label: 'Solar Savings ($)',
+                            data: costData.solarSavings,
+                            backgroundColor: '#10b981',
+                            borderRadius: 4,
+                            stack: 'savings',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                afterBody: function(context) {
+                                    const idx = context[0].dataIndex;
+                                    return `Net: $${(costData.gridCosts[idx] - costData.solarSavings[idx]).toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: '$' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function calculateDailyCostSavings() {
+            // Get last 14 days with both sunrun and SDGE data
+            const combinedDays = [];
+
+            data.sdge.forEach(sdge => {
+                const sunrun = data.sunrun.find(s => s.date === sdge.date);
+                combinedDays.push({
+                    date: sdge.date,
+                    sdge: sdge,
+                    sunrun: sunrun
+                });
+            });
+
+            combinedDays.sort((a, b) => new Date(a.date) - new Date(b.date));
+            const last14 = combinedDays.slice(-14);
+
+            const labels = [];
+            const gridCosts = [];
+            const solarSavings = [];
+
+            last14.forEach(day => {
+                labels.push(formatDate(day.date));
+
+                // Grid cost = what we paid for imported electricity
+                const gridCost = (day.sdge.super_off_peak || 0) * CONFIG.rates.super_off_peak +
+                                 (day.sdge.off_peak || 0) * CONFIG.rates.off_peak +
+                                 (day.sdge.on_peak || 0) * CONFIG.rates.on_peak;
+                gridCosts.push(parseFloat(gridCost.toFixed(2)));
+
+                // Solar savings = value of self-consumed solar (at avg rate we would have paid)
+                // Self-consumed = produced - exported
+                if (day.sunrun) {
+                    const produced = day.sunrun.production_kwh;
+                    const exported = day.sdge.generation || 0;
+                    const selfConsumed = produced - exported;
+                    // Value self-consumed at off-peak rate (conservative estimate)
+                    const savings = selfConsumed * CONFIG.rates.off_peak;
+                    solarSavings.push(parseFloat(savings.toFixed(2)));
+                } else {
+                    solarSavings.push(0);
+                }
+            });
+
+            return { labels, gridCosts, solarSavings };
+        }
+
+        function updateMonthlySummary() {
+            const now = new Date();
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            // Filter to current month
+            const monthSunrun = data.sunrun.filter(d => {
+                const dt = new Date(d.date);
+                return dt.getMonth() === currentMonth && dt.getFullYear() === currentYear;
+            });
+
+            const monthSDGE = data.sdge.filter(d => {
+                const dt = new Date(d.date);
+                return dt.getMonth() === currentMonth && dt.getFullYear() === currentYear;
+            });
+
+            // Calculate totals
+            const totalSolar = monthSunrun.reduce((sum, d) => sum + (d.production_kwh || 0), 0);
+            const totalConsumption = monthSDGE.reduce((sum, d) => sum + (d.consumption || 0), 0);
+            const totalExport = monthSDGE.reduce((sum, d) => sum + (d.generation || 0), 0);
+            const totalSuperOffPeak = monthSDGE.reduce((sum, d) => sum + (d.super_off_peak || 0), 0);
+            const totalOnPeak = monthSDGE.reduce((sum, d) => sum + (d.on_peak || 0), 0);
+
+            // Calculate cost
+            const touTotals = { super_off_peak: totalSuperOffPeak, off_peak: 0, on_peak: totalOnPeak };
+            monthSDGE.forEach(d => touTotals.off_peak += d.off_peak || 0);
+
+            const importCost = touTotals.super_off_peak * CONFIG.rates.super_off_peak +
+                               touTotals.off_peak * CONFIG.rates.off_peak +
+                               touTotals.on_peak * CONFIG.rates.on_peak;
+            const exportCredit = totalExport * CONFIG.exportCredit;
+            const netCost = importCost - exportCredit;
+
+            document.getElementById('monthSolar').textContent = totalSolar.toFixed(0);
+            document.getElementById('monthImport').textContent = totalConsumption.toFixed(0);
+            document.getElementById('monthExport').textContent = totalExport.toFixed(0);
+            document.getElementById('monthSuperOffPeak').textContent = totalSuperOffPeak.toFixed(0);
+            document.getElementById('monthOnPeak').textContent = totalOnPeak.toFixed(0);
+            document.getElementById('monthCost').textContent = '$' + netCost.toFixed(2);
+        }
+
+        // =================================================================
+        // FORM HANDLERS
+        // =================================================================
+        function initializeForms() {
+            // Set default dates to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('sunrunDate').value = today;
+            document.getElementById('sdgeDate').value = today;
+            document.getElementById('activityDate').value = today;
+
+            // Sunrun form
+            document.getElementById('sunrunForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const entry = {
+                    date: document.getElementById('sunrunDate').value,
+                    production_kwh: parseFloat(document.getElementById('sunrunProduction').value),
+                    notes: document.getElementById('sunrunNotes').value || '',
+                };
+
+                // Update or add
+                const existingIdx = data.sunrun.findIndex(d => d.date === entry.date);
+                if (existingIdx >= 0) {
+                    data.sunrun[existingIdx] = entry;
+                } else {
+                    data.sunrun.push(entry);
+                }
+
+                saveData();
+                showToast('Solar data saved!');
+                document.getElementById('sunrunProduction').value = '';
+                document.getElementById('sunrunNotes').value = '';
+                refreshDashboard();
+            });
+
+            // SDGE form
+            document.getElementById('sdgeForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const entry = {
+                    date: document.getElementById('sdgeDate').value,
+                    consumption: parseFloat(document.getElementById('sdgeConsumption').value) || 0,
+                    generation: parseFloat(document.getElementById('sdgeGeneration').value) || 0,
+                    super_off_peak: parseFloat(document.getElementById('sdgeSuperOffPeak').value) || 0,
+                    off_peak: parseFloat(document.getElementById('sdgeOffPeak').value) || 0,
+                    on_peak: parseFloat(document.getElementById('sdgeOnPeak').value) || 0,
+                };
+                entry.net = entry.consumption - entry.generation;
+
+                const existingIdx = data.sdge.findIndex(d => d.date === entry.date);
+                if (existingIdx >= 0) {
+                    data.sdge[existingIdx] = entry;
+                } else {
+                    data.sdge.push(entry);
+                }
+
+                saveData();
+                showToast('SDGE data saved!');
+                refreshDashboard();
+            });
+
+            // Activity form
+            document.getElementById('activityForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const activity = document.getElementById('activityType').value;
+                const startTime = document.getElementById('activityStart').value;
+                const endTime = document.getElementById('activityEnd').value;
+
+                // Calculate duration and estimated kWh
+                const start = new Date('2000-01-01T' + startTime);
+                const end = new Date('2000-01-01T' + endTime);
+                let durationHours = (end - start) / (1000 * 60 * 60);
+                if (durationHours < 0) durationHours += 24;
+
+                const power = CONFIG.appliancePower[activity] || 0.5;
+                const estKwh = power * durationHours;
+
+                const entry = {
+                    date: document.getElementById('activityDate').value,
+                    start_time: startTime,
+                    end_time: endTime,
+                    activity: activity,
+                    location: document.getElementById('activityLocation').value,
+                    notes: document.getElementById('activityNotes').value,
+                    est_kwh: estKwh,
+                    tou_period: getTOUPeriod(document.getElementById('activityDate').value, startTime),
+                };
+
+                data.activities.push(entry);
+                saveData();
+                showToast('Activity logged!');
+                refreshActivities();
+
+                // Reset form
+                document.getElementById('activityType').value = '';
+                document.getElementById('activityNotes').value = '';
+            });
+
+            // File imports
+            document.getElementById('sdgeFileInput').addEventListener('change', handleSDGEImport);
+            document.getElementById('sunrunFileInput').addEventListener('change', handleSunrunImport);
+        }
+
+        // =================================================================
+        // FILE IMPORT
+        // =================================================================
+        function handleSDGEImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            Papa.parse(file, {
+                complete: function(results) {
+                    processSDGEData(results.data);
+                },
+                error: function(err) {
+                    showToast('Error reading file: ' + err.message, 'error');
+                }
+            });
+        }
+
+        function processSDGEData(rows) {
+            console.log('Processing SDGE data, total rows:', rows.length);
+            console.log('First 15 rows:', rows.slice(0, 15));
+
+            // Find header row
+            let headerIdx = rows.findIndex(row =>
+                row.some(cell => cell && cell.toString().includes('Date')) &&
+                row.some(cell => cell && cell.toString().includes('Start Time'))
+            );
+
+            console.log('Header row index:', headerIdx);
+
+            if (headerIdx < 0) {
+                showToast('Could not find header row in SDGE file', 'error');
+                return;
+            }
+
+            console.log('Header row:', rows[headerIdx]);
+
+            const headers = rows[headerIdx].map(h => h.toString().trim().replace(/"/g, ''));
+            const dateIdx = headers.findIndex(h => h === 'Date');
+            const timeIdx = headers.findIndex(h => h === 'Start Time');
+            const consumptionIdx = headers.findIndex(h => h === 'Consumption');
+            const generationIdx = headers.findIndex(h => h === 'Generation');
+            const netIdx = headers.findIndex(h => h === 'Net');
+
+            // Group by date
+            const dailyData = {};
+
+            for (let i = headerIdx + 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row[dateIdx]) continue;
+
+                const dateStr = row[dateIdx].toString().replace(/"/g, '').trim();
+                const timeStr = row[timeIdx].toString().replace(/"/g, '').trim();
+                const consumption = parseFloat(row[consumptionIdx]?.toString().replace(/"/g, '') || 0);
+                const generation = parseFloat(row[generationIdx]?.toString().replace(/"/g, '') || 0);
+                const net = parseFloat(row[netIdx]?.toString().replace(/"/g, '') || 0);
+
+                // Parse date
+                const [month, day, year] = dateStr.split('/');
+                const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+                // Parse time for TOU
+                const time24 = convertTo24Hour(timeStr);
+                const period = getTOUPeriod(isoDate, time24);
+
+                if (!dailyData[isoDate]) {
+                    dailyData[isoDate] = {
+                        date: isoDate,
+                        consumption: 0,
+                        generation: 0,
+                        net: 0,
+                        super_off_peak: 0,
+                        off_peak: 0,
+                        on_peak: 0,
+                    };
+                }
+
+                dailyData[isoDate].consumption += consumption;
+                dailyData[isoDate].generation += generation;
+                dailyData[isoDate].net += net;
+
+                // Track TOU imports (only count positive net = imports from grid)
+                if (net > 0) {
+                    dailyData[isoDate][period] += net;
+                }
+            }
+
+            // Merge into data
+            Object.values(dailyData).forEach(entry => {
+                const existingIdx = data.sdge.findIndex(d => d.date === entry.date);
+                if (existingIdx >= 0) {
+                    data.sdge[existingIdx] = entry;
+                } else {
+                    data.sdge.push(entry);
+                }
+            });
+
+            console.log('Daily data processed:', dailyData);
+            console.log('Number of days:', Object.keys(dailyData).length);
+
+            saveData();
+            const count = Object.keys(dailyData).length;
+            showToast(`Imported ${count} days of SDGE data!`);
+
+            document.getElementById('sdgeImportStatus').classList.remove('hidden');
+            document.getElementById('sdgeImportStatus').querySelector('div').textContent =
+                `Successfully imported ${count} days of data.`;
+
+            refreshDashboard();
+            refreshRecentEntries();
+        }
+
+        function convertTo24Hour(time12h) {
+            const [time, modifier] = time12h.split(' ');
+            let [hours, minutes] = time.split(':');
+            hours = parseInt(hours);
+
+            if (modifier === 'PM' && hours !== 12) hours += 12;
+            if (modifier === 'AM' && hours === 12) hours = 0;
+
+            return `${hours.toString().padStart(2, '0')}:${minutes}`;
+        }
+
+        function handleSunrunImport(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            Papa.parse(file, {
+                header: true,
+                complete: function(results) {
+                    let count = 0;
+                    results.data.forEach(row => {
+                        if (!row.date && !row.Date) return;
+
+                        const date = row.date || row.Date;
+                        const production = parseFloat(row.production_kwh || row.production || row.kWh || 0);
+
+                        if (!date || isNaN(production)) return;
+
+                        const entry = {
+                            date: date,
+                            production_kwh: production,
+                            notes: row.notes || 'Imported',
+                        };
+
+                        const existingIdx = data.sunrun.findIndex(d => d.date === entry.date);
+                        if (existingIdx >= 0) {
+                            data.sunrun[existingIdx] = entry;
+                        } else {
+                            data.sunrun.push(entry);
+                        }
+                        count++;
+                    });
+
+                    saveData();
+                    showToast(`Imported ${count} Sunrun records!`);
+
+                    document.getElementById('sunrunImportStatus').classList.remove('hidden');
+                    document.getElementById('sunrunImportStatus').querySelector('div').textContent =
+                        `Successfully imported ${count} days of data.`;
+
+                    refreshDashboard();
+                    refreshRecentEntries();
+                }
+            });
+        }
+
+        // =================================================================
+        // EXPORT
+        // =================================================================
+        function exportData(type) {
+            let content, filename, mimeType;
+
+            if (type === 'all') {
+                content = JSON.stringify(data, null, 2);
+                filename = 'solar_tracker_backup.json';
+                mimeType = 'application/json';
+            } else {
+                const dataset = data[type];
+                if (!dataset || dataset.length === 0) {
+                    showToast('No data to export', 'error');
+                    return;
+                }
+                content = Papa.unparse(dataset);
+                filename = `${type}_data.csv`;
+                mimeType = 'text/csv';
+            }
+
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            showToast('Data exported!');
+        }
+
+        // =================================================================
+        // RECENT ENTRIES
+        // =================================================================
+        function refreshRecentEntries() {
+            const tbody = document.getElementById('recentEntriesTable');
+
+            // Combine and sort all entries by date
+            const combined = [];
+
+            data.sunrun.forEach(s => {
+                const sdge = data.sdge.find(d => d.date === s.date);
+                combined.push({
+                    date: s.date,
+                    solar: s.production_kwh,
+                    consumption: sdge?.consumption || '-',
+                    export: sdge?.generation || '-',
+                    cost: sdge ? calculateDayCost(sdge) : '-',
+                });
+            });
+
+            // Add SDGE entries without sunrun data
+            data.sdge.forEach(d => {
+                if (!combined.find(c => c.date === d.date)) {
+                    combined.push({
+                        date: d.date,
+                        solar: '-',
+                        consumption: d.consumption,
+                        export: d.generation,
+                        cost: calculateDayCost(d),
+                    });
+                }
+            });
+
+            combined.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            tbody.innerHTML = combined.slice(0, 30).map(row => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-2">${formatDate(row.date)}</td>
+                    <td class="p-2 text-right">${typeof row.solar === 'number' ? row.solar.toFixed(1) : row.solar}</td>
+                    <td class="p-2 text-right">${typeof row.consumption === 'number' ? row.consumption.toFixed(1) : row.consumption}</td>
+                    <td class="p-2 text-right">${typeof row.export === 'number' ? row.export.toFixed(1) : row.export}</td>
+                    <td class="p-2 text-right">${typeof row.cost === 'number' ? '$' + row.cost.toFixed(2) : row.cost}</td>
+                    <td class="p-2 text-center">
+                        <button onclick="deleteEntry('${row.date}')" class="text-red-500 hover:text-red-700 text-xs">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function calculateDayCost(sdge) {
+            const importCost = (sdge.super_off_peak || 0) * CONFIG.rates.super_off_peak +
+                               (sdge.off_peak || 0) * CONFIG.rates.off_peak +
+                               (sdge.on_peak || 0) * CONFIG.rates.on_peak;
+            const exportCredit = (sdge.generation || 0) * CONFIG.exportCredit;
+            return importCost - exportCredit;
+        }
+
+        function deleteEntry(date) {
+            if (!confirm('Delete all data for ' + date + '?')) return;
+
+            data.sunrun = data.sunrun.filter(d => d.date !== date);
+            data.sdge = data.sdge.filter(d => d.date !== date);
+            data.activities = data.activities.filter(d => d.date !== date);
+
+            saveData();
+            showToast('Entry deleted');
+            refreshRecentEntries();
+            refreshDashboard();
+        }
+
+        // =================================================================
+        // ACTIVITIES
+        // =================================================================
+        function refreshActivities() {
+            const tbody = document.getElementById('activityTable');
+            const sorted = [...data.activities].sort((a, b) => {
+                const dateCompare = new Date(b.date) - new Date(a.date);
+                if (dateCompare !== 0) return dateCompare;
+                return b.start_time.localeCompare(a.start_time);
+            });
+
+            tbody.innerHTML = sorted.slice(0, 50).map(a => {
+                const cost = a.est_kwh * CONFIG.rates[a.tou_period];
+                const periodClass = {
+                    'super_off_peak': 'bg-green-100 text-green-800',
+                    'off_peak': 'bg-blue-100 text-blue-800',
+                    'on_peak': 'bg-red-100 text-red-800',
+                }[a.tou_period];
+
+                return `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="p-2">${formatDate(a.date)}</td>
+                        <td class="p-2">${a.start_time} - ${a.end_time}</td>
+                        <td class="p-2">${a.activity}</td>
+                        <td class="p-2 text-right">${a.est_kwh.toFixed(2)}</td>
+                        <td class="p-2 text-right">$${cost.toFixed(2)}</td>
+                        <td class="p-2 text-center">
+                            <span class="text-xs px-2 py-1 rounded ${periodClass}">${a.tou_period.replace('_', ' ')}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Update activity chart
+            updateActivityChart();
+        }
+
+        function updateActivityChart() {
+            // Group activities by type
+            const byActivity = {};
+            data.activities.forEach(a => {
+                if (!byActivity[a.activity]) byActivity[a.activity] = 0;
+                byActivity[a.activity] += a.est_kwh;
+            });
+
+            const sorted = Object.entries(byActivity)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8);
+
+            const ctx = document.getElementById('activityChart').getContext('2d');
+            if (activityChart) activityChart.destroy();
+            activityChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sorted.map(([name]) => name),
+                    datasets: [{
+                        label: 'Total kWh',
+                        data: sorted.map(([, kwh]) => kwh),
+                        backgroundColor: '#10b981',
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                }
+            });
+        }
+
+        // =================================================================
+        // SETTINGS
+        // =================================================================
+        function clearAllData() {
+            if (!confirm('This will delete ALL your data. Are you sure?')) return;
+            if (!confirm('Really delete everything? This cannot be undone!')) return;
+
+            data = { sunrun: [], sdge: [], activities: [] };
+            saveData();
+            showToast('All data cleared');
+            refreshDashboard();
+        }
+
+        // =================================================================
+        // INITIALIZATION
+        // =================================================================
+        function init() {
+            loadData();
+            initializeForms();
+            refreshDashboard();
+
+            // Update time every minute
+            setInterval(updateCurrentTime, 60000);
+
+            // Auto-save reminder
+            setInterval(() => {
+                if (data.sunrun.length > 0 || data.sdge.length > 0) {
+                    saveData();
+                }
+            }, 30000);
+        }
+
+        // Start the app
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

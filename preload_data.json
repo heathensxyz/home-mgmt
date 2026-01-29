@@ -1,0 +1,387 @@
+{
+  "sunrun": [
+    {
+      "date": "2025-12-27",
+      "production_kwh": 19.8,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2025-12-28",
+      "production_kwh": 20.6,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2025-12-29",
+      "production_kwh": 21.6,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2025-12-30",
+      "production_kwh": 3.9,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2025-12-31",
+      "production_kwh": 1.8,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-01",
+      "production_kwh": 5.4,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-02",
+      "production_kwh": 10.7,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-03",
+      "production_kwh": 10.3,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-04",
+      "production_kwh": 11.4,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-05",
+      "production_kwh": 18.9,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-06",
+      "production_kwh": 10.0,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-07",
+      "production_kwh": 17.1,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-08",
+      "production_kwh": 19.4,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-09",
+      "production_kwh": 21.9,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-10",
+      "production_kwh": 22.6,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-11",
+      "production_kwh": 22.5,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-12",
+      "production_kwh": 21.8,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-13",
+      "production_kwh": 22.2,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-14",
+      "production_kwh": 22.0,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-15",
+      "production_kwh": 21.8,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-16",
+      "production_kwh": 22.4,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-17",
+      "production_kwh": 22.1,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-18",
+      "production_kwh": 20.4,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-19",
+      "production_kwh": 22.5,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-20",
+      "production_kwh": 20.3,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-21",
+      "production_kwh": 10.6,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-22",
+      "production_kwh": 11.2,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-23",
+      "production_kwh": 15.2,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-24",
+      "production_kwh": 12.6,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-25",
+      "production_kwh": 21.8,
+      "notes": "Browser automation extraction"
+    },
+    {
+      "date": "2026-01-26",
+      "production_kwh": 17.1,
+      "notes": "Browser automation extraction"
+    }
+  ],
+  "sdge": [
+    {
+      "date": "2026-01-02",
+      "consumption": 18.535,
+      "generation": 4.84,
+      "net": 13.695,
+      "super_off_peak": 1.78,
+      "off_peak": 14.430000000000001,
+      "on_peak": 1.8500000000000005
+    },
+    {
+      "date": "2026-01-03",
+      "consumption": 11.58,
+      "generation": 6.285,
+      "net": 5.295,
+      "super_off_peak": 2.37,
+      "off_peak": 3.54,
+      "on_peak": 5.515000000000001
+    },
+    {
+      "date": "2026-01-04",
+      "consumption": 10.879999999999999,
+      "generation": 6.735,
+      "net": 4.145,
+      "super_off_peak": 3.1399999999999997,
+      "off_peak": 3.91,
+      "on_peak": 3.6950000000000003
+    },
+    {
+      "date": "2026-01-05",
+      "consumption": 9.559999999999999,
+      "generation": 12.3,
+      "net": -2.7399999999999998,
+      "super_off_peak": 3.09,
+      "off_peak": 3.085,
+      "on_peak": 3.245
+    },
+    {
+      "date": "2026-01-06",
+      "consumption": 10.595,
+      "generation": 4.34,
+      "net": 6.255000000000001,
+      "super_off_peak": 3.315,
+      "off_peak": 3.625,
+      "on_peak": 3.43
+    },
+    {
+      "date": "2026-01-07",
+      "consumption": 12.5,
+      "generation": 11.585,
+      "net": 0.9150000000000005,
+      "super_off_peak": 3.6350000000000002,
+      "off_peak": 3.425,
+      "on_peak": 5.404999999999999
+    },
+    {
+      "date": "2026-01-08",
+      "consumption": 10.185,
+      "generation": 13.469999999999999,
+      "net": -3.285,
+      "super_off_peak": 3.085,
+      "off_peak": 3.0349999999999993,
+      "on_peak": 3.85
+    },
+    {
+      "date": "2026-01-09",
+      "consumption": 61.504999999999995,
+      "generation": 15.35,
+      "net": 46.155,
+      "super_off_peak": 52.67,
+      "off_peak": 4.855,
+      "on_peak": 3.8899999999999997
+    },
+    {
+      "date": "2026-01-10",
+      "consumption": 27.395000000000003,
+      "generation": 8.0,
+      "net": 19.395,
+      "super_off_peak": 20.165,
+      "off_peak": 1.87,
+      "on_peak": 5.26
+    },
+    {
+      "date": "2026-01-11",
+      "consumption": 40.705,
+      "generation": 2.5600000000000005,
+      "net": 38.144999999999996,
+      "super_off_peak": 25.805000000000007,
+      "off_peak": 5.73,
+      "on_peak": 8.879999999999999
+    },
+    {
+      "date": "2026-01-12",
+      "consumption": 21.585,
+      "generation": 7.5249999999999995,
+      "net": 14.06,
+      "super_off_peak": 11.949999999999998,
+      "off_peak": 4.85,
+      "on_peak": 4.76
+    },
+    {
+      "date": "2026-01-13",
+      "consumption": 66.66000000000001,
+      "generation": 8.85,
+      "net": 57.81,
+      "super_off_peak": 57.05500000000001,
+      "off_peak": 3.39,
+      "on_peak": 6.11
+    },
+    {
+      "date": "2026-01-14",
+      "consumption": 18.615000000000002,
+      "generation": 8.355,
+      "net": 10.26,
+      "super_off_peak": 10.565,
+      "off_peak": 3.495,
+      "on_peak": 4.44
+    },
+    {
+      "date": "2026-01-15",
+      "consumption": 23.555,
+      "generation": 6.85,
+      "net": 16.705,
+      "super_off_peak": 13.105,
+      "off_peak": 4.98,
+      "on_peak": 5.135
+    },
+    {
+      "date": "2026-01-16",
+      "consumption": 11.0,
+      "generation": 8.61,
+      "net": 2.39,
+      "super_off_peak": 3.135,
+      "off_peak": 3.6050000000000004,
+      "on_peak": 4.12
+    },
+    {
+      "date": "2026-01-17",
+      "consumption": 42.79,
+      "generation": 8.425,
+      "net": 34.364999999999995,
+      "super_off_peak": 16.349999999999998,
+      "off_peak": 9.455,
+      "on_peak": 16.775
+    },
+    {
+      "date": "2026-01-18",
+      "consumption": 29.865000000000002,
+      "generation": 2.795,
+      "net": 27.07,
+      "super_off_peak": 8.3,
+      "off_peak": 6.550000000000001,
+      "on_peak": 14.82
+    },
+    {
+      "date": "2026-01-19",
+      "consumption": 23.215000000000003,
+      "generation": 4.5,
+      "net": 18.715000000000003,
+      "super_off_peak": 4.715,
+      "off_peak": 6.234999999999999,
+      "on_peak": 12.215
+    },
+    {
+      "date": "2026-01-20",
+      "consumption": 27.53,
+      "generation": 3.7199999999999998,
+      "net": 23.81,
+      "super_off_peak": 4.9,
+      "off_peak": 9.165,
+      "on_peak": 13.415
+    },
+    {
+      "date": "2026-01-21",
+      "consumption": 44.15,
+      "generation": 0.005,
+      "net": 44.144999999999996,
+      "super_off_peak": 14.2,
+      "off_peak": 15.865,
+      "on_peak": 14.079999999999998
+    },
+    {
+      "date": "2026-01-22",
+      "consumption": 34.47,
+      "generation": 1.18,
+      "net": 33.29,
+      "super_off_peak": 6.85,
+      "off_peak": 13.475000000000001,
+      "on_peak": 13.45
+    },
+    {
+      "date": "2026-01-23",
+      "consumption": 27.83,
+      "generation": 2.045,
+      "net": 25.785,
+      "super_off_peak": 4.5600000000000005,
+      "off_peak": 9.425,
+      "on_peak": 13.31
+    },
+    {
+      "date": "2026-01-24",
+      "consumption": 35.44,
+      "generation": 1.8150000000000002,
+      "net": 33.625,
+      "super_off_peak": 12.499999999999998,
+      "off_peak": 8.955000000000002,
+      "on_peak": 13.729999999999997
+    },
+    {
+      "date": "2026-01-25",
+      "consumption": 27.35,
+      "generation": 3.7600000000000002,
+      "net": 23.590000000000003,
+      "super_off_peak": 6.960000000000001,
+      "off_peak": 6.074999999999999,
+      "on_peak": 14.005
+    },
+    {
+      "date": "2026-01-26",
+      "consumption": 24.69,
+      "generation": 4.944999999999999,
+      "net": 19.745,
+      "super_off_peak": 4.290000000000001,
+      "off_peak": 8.115,
+      "on_peak": 12.000000000000002
+    }
+  ],
+  "activities": []
+}
