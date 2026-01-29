@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solar Power Tracker - Tay's Home</title>
+    <title>Solar Power Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -21,9 +21,63 @@
         .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 24px;
                  border-radius: 8px; z-index: 1000; animation: slideIn 0.3s ease-out; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        #password-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                           background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%);
+                           display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        #password-box { background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                       text-align: center; max-width: 400px; width: 90%; }
+        #password-input { width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px;
+                         font-size: 16px; margin: 1rem 0; }
+        #password-input:focus { outline: none; border-color: #f59e0b; }
+        #password-submit { background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%); color: white;
+                          padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600;
+                          cursor: pointer; width: 100%; font-size: 16px; }
+        #password-submit:hover { opacity: 0.9; }
+        #password-error { color: #dc2626; margin-top: 0.5rem; font-size: 14px; display: none; }
+        #main-content { display: none; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
+    <!-- Password Protection Overlay -->
+    <div id="password-overlay">
+        <div id="password-box">
+            <svg class="w-16 h-16 mx-auto mb-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">Solar Power Tracker</h2>
+            <p class="text-gray-600 mb-4">Enter password to continue</p>
+            <form onsubmit="checkPassword(event)">
+                <input type="password" id="password-input" placeholder="Password" autocomplete="off">
+                <button type="submit" id="password-submit">Access Dashboard</button>
+            </form>
+            <p id="password-error">Incorrect password. Please try again.</p>
+        </div>
+    </div>
+    <script>
+        function checkPassword(e) {
+            e.preventDefault();
+            const input = document.getElementById('password-input').value;
+            const correctHash = '8a9c1f2b3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a';
+            const inputHash = Array.from(input).reduce((hash, char) => {
+                return ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+            }, 0).toString(16);
+            if (input === 'r9MMH*xu@!*VDyDmW@*8EZy@Bjxm') {
+                document.getElementById('password-overlay').style.display = 'none';
+                document.getElementById('main-content').style.display = 'block';
+                sessionStorage.setItem('authenticated', 'true');
+            } else {
+                document.getElementById('password-error').style.display = 'block';
+                document.getElementById('password-input').value = '';
+            }
+        }
+        // Check if already authenticated this session
+        if (sessionStorage.getItem('authenticated') === 'true') {
+            document.getElementById('password-overlay').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+        }
+    </script>
+
+    <div id="main-content">
     <!-- Header -->
     <header class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-4 shadow-lg">
         <div class="max-w-6xl mx-auto flex items-center justify-between">
@@ -2018,5 +2072,6 @@
         // Start the app
         document.addEventListener('DOMContentLoaded', init);
     </script>
+    </div><!-- end main-content -->
 </body>
 </html>
