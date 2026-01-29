@@ -2425,7 +2425,7 @@
                 return `
                     <tr class="border-b hover:bg-gray-50">
                         <td class="p-2">${formatDate(a.date)}</td>
-                        <td class="p-2">${a.start_time} - ${a.end_time}</td>
+                        <td class="p-2">${normalizeTime(a.start_time) || a.start_time} - ${normalizeTime(a.end_time) || a.end_time}</td>
                         <td class="p-2">${a.activity}</td>
                         <td class="p-2 text-right">${a.est_kwh.toFixed(2)}</td>
                         <td class="p-2 text-right">$${cost.toFixed(2)}</td>

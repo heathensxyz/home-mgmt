@@ -133,6 +133,23 @@ function doPost(e) {
   }
 }
 
+// Helper: Format a Date object to HH:MM string
+function formatTime(date) {
+  if (!(date instanceof Date)) return date;
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+// Helper: Format a Date object to YYYY-MM-DD string
+function formatDate(date) {
+  if (!(date instanceof Date)) return date;
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // Helper: Get all data from a sheet as array of objects
 function getSheetData(sheet) {
   const data = sheet.getDataRange().getValues();
@@ -144,7 +161,18 @@ function getSheetData(sheet) {
   return rows.map(row => {
     const obj = {};
     headers.forEach((header, i) => {
-      obj[header] = row[i];
+      let value = row[i];
+
+      // Format Date objects based on column name
+      if (value instanceof Date) {
+        if (header === 'date') {
+          value = formatDate(value);
+        } else if (header.includes('time')) {
+          value = formatTime(value);
+        }
+      }
+
+      obj[header] = value;
     });
     return obj;
   }).filter(row => row.date); // Filter out empty rows
