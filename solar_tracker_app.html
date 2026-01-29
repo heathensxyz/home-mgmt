@@ -624,6 +624,31 @@
         <!-- Settings Tab -->
         <div id="content-settings" class="tab-content hidden fade-in">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Google Sheets Sync Card -->
+                <div class="card p-6 lg:col-span-2 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200">
+                    <div class="flex items-center gap-3 mb-4">
+                        <svg class="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                        <h3 class="text-lg font-semibold text-green-800">Google Sheets Sync</h3>
+                        <span id="syncStatus" class="ml-auto px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600">Not Connected</span>
+                    </div>
+                    <p class="text-sm text-green-700 mb-4">Connect to Google Sheets to sync your data across all devices automatically.</p>
+                    <div class="flex gap-4 items-end">
+                        <div class="flex-1">
+                            <label class="block text-sm text-gray-600 mb-1">Google Apps Script Web App URL</label>
+                            <input type="url" id="settingSheetsApiUrl" placeholder="https://script.google.com/macros/s/..." class="w-full">
+                        </div>
+                        <button type="button" onclick="testSheetsConnection()" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium whitespace-nowrap">
+                            Test Connection
+                        </button>
+                        <button type="button" onclick="syncFromSheets()" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium whitespace-nowrap">
+                            Sync Now
+                        </button>
+                    </div>
+                    <div id="syncMessage" class="mt-3 text-sm hidden"></div>
+                </div>
+
                 <div class="card p-6">
                     <h3 class="text-lg font-semibold mb-4">System Configuration</h3>
                     <form id="settingsForm" class="space-y-4">
@@ -730,11 +755,164 @@
             activities: [],  // { date, start_time, end_time, activity, location, notes, est_kwh }
         };
 
+        // Google Sheets API URL (stored in localStorage)
+        let SHEETS_API_URL = localStorage.getItem('sheetsApiUrl') || '';
+
+        // =================================================================
+        // GOOGLE SHEETS SYNC FUNCTIONS
+        // =================================================================
+        function getSheetsApiUrl() {
+            return localStorage.getItem('sheetsApiUrl') || '';
+        }
+
+        function setSheetsApiUrl(url) {
+            localStorage.setItem('sheetsApiUrl', url);
+            SHEETS_API_URL = url;
+            updateSyncStatus();
+        }
+
+        function updateSyncStatus() {
+            const statusEl = document.getElementById('syncStatus');
+            if (!statusEl) return;
+
+            if (SHEETS_API_URL) {
+                statusEl.textContent = 'Connected';
+                statusEl.className = 'ml-auto px-3 py-1 rounded-full text-sm font-medium bg-green-200 text-green-800';
+            } else {
+                statusEl.textContent = 'Not Connected';
+                statusEl.className = 'ml-auto px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600';
+            }
+        }
+
+        async function testSheetsConnection() {
+            const urlInput = document.getElementById('settingSheetsApiUrl');
+            const url = urlInput.value.trim();
+            const msgEl = document.getElementById('syncMessage');
+
+            if (!url) {
+                msgEl.textContent = '❌ Please enter a URL first';
+                msgEl.className = 'mt-3 text-sm text-red-600';
+                msgEl.classList.remove('hidden');
+                return;
+            }
+
+            msgEl.textContent = '⏳ Testing connection...';
+            msgEl.className = 'mt-3 text-sm text-blue-600';
+            msgEl.classList.remove('hidden');
+
+            try {
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    setSheetsApiUrl(url);
+                    msgEl.textContent = '✅ Connected successfully! Your data will now sync automatically.';
+                    msgEl.className = 'mt-3 text-sm text-green-600';
+                    showToast('Google Sheets connected!', 'success');
+                } else {
+                    msgEl.textContent = '❌ Connection failed: ' + (result.error || 'Unknown error');
+                    msgEl.className = 'mt-3 text-sm text-red-600';
+                }
+            } catch (error) {
+                msgEl.textContent = '❌ Connection failed: ' + error.message;
+                msgEl.className = 'mt-3 text-sm text-red-600';
+            }
+        }
+
+        async function syncFromSheets() {
+            if (!SHEETS_API_URL) {
+                showToast('Please connect to Google Sheets first', 'error');
+                return;
+            }
+
+            const msgEl = document.getElementById('syncMessage');
+            msgEl.textContent = '⏳ Syncing from Google Sheets...';
+            msgEl.className = 'mt-3 text-sm text-blue-600';
+            msgEl.classList.remove('hidden');
+
+            try {
+                const response = await fetch(SHEETS_API_URL);
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    // Merge sheet data with local data
+                    if (result.data.sunrun) {
+                        result.data.sunrun.forEach(entry => {
+                            const existing = data.sunrun.findIndex(e => e.date === entry.date);
+                            if (existing >= 0) {
+                                data.sunrun[existing] = entry;
+                            } else {
+                                data.sunrun.push(entry);
+                            }
+                        });
+                    }
+                    if (result.data.sdge) {
+                        result.data.sdge.forEach(entry => {
+                            const existing = data.sdge.findIndex(e => e.date === entry.date);
+                            if (existing >= 0) {
+                                data.sdge[existing] = entry;
+                            } else {
+                                data.sdge.push(entry);
+                            }
+                        });
+                    }
+                    if (result.data.activities) {
+                        data.activities = result.data.activities;
+                    }
+
+                    saveDataLocal();
+                    refreshDashboard();
+                    msgEl.textContent = '✅ Synced successfully!';
+                    msgEl.className = 'mt-3 text-sm text-green-600';
+                    showToast('Data synced from Google Sheets!', 'success');
+                } else {
+                    msgEl.textContent = '❌ Sync failed: ' + (result.error || 'Unknown error');
+                    msgEl.className = 'mt-3 text-sm text-red-600';
+                }
+            } catch (error) {
+                msgEl.textContent = '❌ Sync failed: ' + error.message;
+                msgEl.className = 'mt-3 text-sm text-red-600';
+            }
+        }
+
+        async function syncToSheets(action, payload) {
+            if (!SHEETS_API_URL) return;
+
+            try {
+                await fetch(SHEETS_API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, ...payload })
+                });
+            } catch (error) {
+                console.error('Sheets sync error:', error);
+            }
+        }
+
+        async function uploadAllDataToSheets() {
+            if (!SHEETS_API_URL) return;
+
+            try {
+                await fetch(SHEETS_API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'syncAll', data: data })
+                });
+                showToast('Data uploaded to Google Sheets!', 'success');
+            } catch (error) {
+                console.error('Upload error:', error);
+                showToast('Upload failed', 'error');
+            }
+        }
+
         // Preloaded data from CSV files (auto-generated)
         const PRELOADED_DATA = {"sunrun":[{"date":"2025-12-27","production_kwh":19.8,"notes":"Browser automation extraction"},{"date":"2025-12-28","production_kwh":20.6,"notes":"Browser automation extraction"},{"date":"2025-12-29","production_kwh":21.6,"notes":"Browser automation extraction"},{"date":"2025-12-30","production_kwh":3.9,"notes":"Browser automation extraction"},{"date":"2025-12-31","production_kwh":1.8,"notes":"Browser automation extraction"},{"date":"2026-01-01","production_kwh":5.4,"notes":"Browser automation extraction"},{"date":"2026-01-02","production_kwh":10.7,"notes":"Browser automation extraction"},{"date":"2026-01-03","production_kwh":10.3,"notes":"Browser automation extraction"},{"date":"2026-01-04","production_kwh":11.4,"notes":"Browser automation extraction"},{"date":"2026-01-05","production_kwh":18.9,"notes":"Browser automation extraction"},{"date":"2026-01-06","production_kwh":10.0,"notes":"Browser automation extraction"},{"date":"2026-01-07","production_kwh":17.1,"notes":"Browser automation extraction"},{"date":"2026-01-08","production_kwh":19.4,"notes":"Browser automation extraction"},{"date":"2026-01-09","production_kwh":21.9,"notes":"Browser automation extraction"},{"date":"2026-01-10","production_kwh":22.6,"notes":"Browser automation extraction"},{"date":"2026-01-11","production_kwh":22.5,"notes":"Browser automation extraction"},{"date":"2026-01-12","production_kwh":21.8,"notes":"Browser automation extraction"},{"date":"2026-01-13","production_kwh":22.2,"notes":"Browser automation extraction"},{"date":"2026-01-14","production_kwh":22.0,"notes":"Browser automation extraction"},{"date":"2026-01-15","production_kwh":21.8,"notes":"Browser automation extraction"},{"date":"2026-01-16","production_kwh":22.4,"notes":"Browser automation extraction"},{"date":"2026-01-17","production_kwh":22.1,"notes":"Browser automation extraction"},{"date":"2026-01-18","production_kwh":20.4,"notes":"Browser automation extraction"},{"date":"2026-01-19","production_kwh":22.5,"notes":"Browser automation extraction"},{"date":"2026-01-20","production_kwh":20.3,"notes":"Browser automation extraction"},{"date":"2026-01-21","production_kwh":10.6,"notes":"Browser automation extraction"},{"date":"2026-01-22","production_kwh":11.2,"notes":"Browser automation extraction"},{"date":"2026-01-23","production_kwh":15.2,"notes":"Browser automation extraction"},{"date":"2026-01-24","production_kwh":12.6,"notes":"Browser automation extraction"},{"date":"2026-01-25","production_kwh":21.8,"notes":"Browser automation extraction"},{"date":"2026-01-26","production_kwh":17.1,"notes":"Browser automation extraction"}],"sdge":[{"date":"2026-01-02","consumption":18.535,"generation":4.84,"net":13.695,"super_off_peak":1.78,"off_peak":14.43,"on_peak":1.85},{"date":"2026-01-03","consumption":11.58,"generation":6.285,"net":5.295,"super_off_peak":2.37,"off_peak":3.54,"on_peak":5.52},{"date":"2026-01-04","consumption":10.88,"generation":6.735,"net":4.145,"super_off_peak":3.14,"off_peak":3.91,"on_peak":3.7},{"date":"2026-01-05","consumption":9.56,"generation":12.3,"net":-2.74,"super_off_peak":3.09,"off_peak":3.09,"on_peak":3.25},{"date":"2026-01-06","consumption":10.6,"generation":4.34,"net":6.26,"super_off_peak":3.32,"off_peak":3.63,"on_peak":3.43},{"date":"2026-01-07","consumption":12.5,"generation":11.59,"net":0.92,"super_off_peak":3.64,"off_peak":3.43,"on_peak":5.4},{"date":"2026-01-08","consumption":10.19,"generation":13.47,"net":-3.29,"super_off_peak":3.09,"off_peak":3.04,"on_peak":3.85},{"date":"2026-01-09","consumption":61.5,"generation":15.35,"net":46.16,"super_off_peak":52.67,"off_peak":4.86,"on_peak":3.89},{"date":"2026-01-10","consumption":27.4,"generation":8.0,"net":19.4,"super_off_peak":20.17,"off_peak":1.87,"on_peak":5.26},{"date":"2026-01-11","consumption":40.71,"generation":2.56,"net":38.14,"super_off_peak":25.81,"off_peak":5.73,"on_peak":8.88},{"date":"2026-01-12","consumption":21.59,"generation":7.52,"net":14.06,"super_off_peak":11.95,"off_peak":4.85,"on_peak":4.76},{"date":"2026-01-13","consumption":66.66,"generation":8.85,"net":57.81,"super_off_peak":57.06,"off_peak":3.39,"on_peak":6.11},{"date":"2026-01-14","consumption":18.62,"generation":8.36,"net":10.26,"super_off_peak":10.57,"off_peak":3.5,"on_peak":4.44},{"date":"2026-01-15","consumption":23.56,"generation":6.85,"net":16.71,"super_off_peak":13.11,"off_peak":4.98,"on_peak":5.14},{"date":"2026-01-16","consumption":11.0,"generation":8.61,"net":2.39,"super_off_peak":3.14,"off_peak":3.61,"on_peak":4.12},{"date":"2026-01-17","consumption":42.79,"generation":8.43,"net":34.36,"super_off_peak":16.35,"off_peak":9.46,"on_peak":16.78},{"date":"2026-01-18","consumption":29.87,"generation":2.8,"net":27.07,"super_off_peak":8.3,"off_peak":6.55,"on_peak":14.82},{"date":"2026-01-19","consumption":23.22,"generation":4.5,"net":18.72,"super_off_peak":4.72,"off_peak":6.23,"on_peak":12.22},{"date":"2026-01-20","consumption":27.53,"generation":3.72,"net":23.81,"super_off_peak":4.9,"off_peak":9.17,"on_peak":13.42},{"date":"2026-01-21","consumption":44.15,"generation":0.01,"net":44.14,"super_off_peak":14.2,"off_peak":15.87,"on_peak":14.08},{"date":"2026-01-22","consumption":34.47,"generation":1.18,"net":33.29,"super_off_peak":6.85,"off_peak":13.48,"on_peak":13.45},{"date":"2026-01-23","consumption":27.83,"generation":2.05,"net":25.79,"super_off_peak":4.56,"off_peak":9.43,"on_peak":13.31},{"date":"2026-01-24","consumption":35.44,"generation":1.82,"net":33.63,"super_off_peak":12.5,"off_peak":8.96,"on_peak":13.73},{"date":"2026-01-25","consumption":27.35,"generation":3.76,"net":23.59,"super_off_peak":6.96,"off_peak":6.07,"on_peak":14.01},{"date":"2026-01-26","consumption":24.69,"generation":4.94,"net":19.75,"super_off_peak":4.29,"off_peak":8.12,"on_peak":12.0}],"activities":[]};
 
-        // Load data from localStorage, merge with preloaded data
-        function loadData() {
+        // Load data from localStorage, merge with preloaded data, then sync from Sheets
+        async function loadData() {
+            // First load from localStorage (instant, works offline)
             const saved = localStorage.getItem('solarTrackerData');
             if (saved) {
                 data = JSON.parse(saved);
@@ -754,14 +932,118 @@
                 });
                 // Save merged data
                 if (data.sunrun.length > 0 || data.sdge.length > 0) {
-                    saveData();
+                    saveDataLocal();
+                }
+            }
+
+            // Load Sheets API URL from settings
+            SHEETS_API_URL = getSheetsApiUrl();
+            const urlInput = document.getElementById('settingSheetsApiUrl');
+            if (urlInput && SHEETS_API_URL) {
+                urlInput.value = SHEETS_API_URL;
+            }
+            updateSyncStatus();
+
+            // If connected to Sheets, sync in background
+            if (SHEETS_API_URL) {
+                try {
+                    const response = await fetch(SHEETS_API_URL);
+                    const result = await response.json();
+
+                    if (result.success && result.data) {
+                        let hasChanges = false;
+
+                        // Merge sheet data (sheets wins for conflicts)
+                        if (result.data.sunrun && result.data.sunrun.length > 0) {
+                            result.data.sunrun.forEach(entry => {
+                                const existing = data.sunrun.findIndex(e => e.date === entry.date);
+                                if (existing >= 0) {
+                                    data.sunrun[existing] = entry;
+                                } else {
+                                    data.sunrun.push(entry);
+                                }
+                                hasChanges = true;
+                            });
+                        }
+                        if (result.data.sdge && result.data.sdge.length > 0) {
+                            result.data.sdge.forEach(entry => {
+                                const existing = data.sdge.findIndex(e => e.date === entry.date);
+                                if (existing >= 0) {
+                                    data.sdge[existing] = entry;
+                                } else {
+                                    data.sdge.push(entry);
+                                }
+                                hasChanges = true;
+                            });
+                        }
+                        if (result.data.activities && result.data.activities.length > 0) {
+                            data.activities = result.data.activities;
+                            hasChanges = true;
+                        }
+
+                        if (hasChanges) {
+                            saveDataLocal();
+                            refreshDashboard();
+                        }
+                    }
+                } catch (error) {
+                    console.log('Sheets sync unavailable, using local data:', error.message);
                 }
             }
         }
 
-        // Save data to localStorage
-        function saveData() {
+        // Save data to localStorage only (internal use)
+        function saveDataLocal() {
             localStorage.setItem('solarTrackerData', JSON.stringify(data));
+        }
+
+        // Save data to localStorage AND sync to Google Sheets
+        function saveData() {
+            saveDataLocal();
+            // Sync to sheets in background (non-blocking)
+            if (SHEETS_API_URL) {
+                syncToSheets('syncAll', { data: data });
+            }
+        }
+
+        // Save single Sunrun entry to Sheets
+        function saveSunrunEntry(entry) {
+            saveDataLocal();
+            if (SHEETS_API_URL) {
+                syncToSheets('saveSunrun', { entry: entry });
+            }
+        }
+
+        // Save single SDGE entry to Sheets
+        function saveSDGEEntry(entry) {
+            saveDataLocal();
+            if (SHEETS_API_URL) {
+                syncToSheets('saveSDGE', { entry: entry });
+            }
+        }
+
+        // Save single Activity entry to Sheets
+        function saveActivityEntry(entry) {
+            saveDataLocal();
+            if (SHEETS_API_URL) {
+                syncToSheets('saveActivity', { entry: entry });
+            }
+        }
+
+        // Save bulk SDGE entries to Sheets
+        function saveBulkSDGE(entries) {
+            saveDataLocal();
+            if (SHEETS_API_URL) {
+                syncToSheets('saveBulkSDGE', { entries: entries });
+            }
+        }
+
+        // Save bulk Sunrun entries to Sheets
+        function saveBulkSunrun(entries) {
+            saveDataLocal();
+            if (SHEETS_API_URL) {
+                syncToSheets('saveBulkSunrun', { entries: entries });
+            }
         }
 
         // =================================================================
